@@ -54,7 +54,7 @@ export default function Home() {
   const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: "", categoria: "Anime", imagen: "/img/goku.jpg" });
   const [editandoPrecio, setEditandoPrecio] = useState<{ id: number, precio: string } | null>(null);
 
-  // Estado para el acordeón de "Nosotros" (Inicia cerrado)
+  // Estado para el acordeón de "Nosotros"
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
 
   const cargarProductos = async () => {
@@ -281,28 +281,51 @@ export default function Home() {
         <AnimatePresence mode="wait">
           <motion.div key={vistaActual} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.4, ease: "easeInOut" }} className="flex-grow flex flex-col w-full">
             
-            {/* VISTA: INICIO ACTUALIZADA CON IMAGEN */}
+            {/* VISTA: INICIO ACTUALIZADA CON NUEVO TEXTO Y DISEÑO */}
             {vistaActual === "inicio" && (
-              <div className="h-[85vh] flex flex-col justify-center items-center text-center px-4 bg-gradient-to-b from-black to-zinc-900">
+              <div className="min-h-[85vh] flex flex-col justify-center items-center text-center px-4 bg-gradient-to-b from-black to-zinc-900 py-12">
                 
+                {/* Imagen más pequeña para dar espacio al texto */}
                 <motion.img 
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.8 }}
                   src="/img/hero.png" 
                   alt="Pinturarte Studio" 
-                  className="w-64 md:w-[450px] mb-6 drop-shadow-[0_0_15px_rgba(202,138,4,0.3)]" 
+                  className="w-48 md:w-64 mb-6 drop-shadow-[0_0_15px_rgba(202,138,4,0.3)]" 
                 />
 
-                <h2 className="text-4xl md:text-6xl font-extrabold mb-4 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600">
-                  Arte en Yeso Pintado a Mano
-                </h2>
-                <p className="text-lg md:text-xl text-gray-300 max-w-2xl mb-8">
-                  Descubre nuestra colección exclusiva de figuras religiosas, decorativas, anime y de colección. Hechas con dedicación y detalle para darle vida a tus espacios.
-                </p>
-                <button onClick={() => cambiarVista("catalogo")} className="bg-yellow-600 text-black px-8 py-3 rounded-full font-bold text-lg hover:bg-yellow-500 transition transform hover:scale-105 shadow-[0_0_15px_rgba(202,138,4,0.5)]">
-                  Ver Catálogo Completo
-                </button>
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 1, delay: 0.3 }}
+                  className="flex flex-col items-center max-w-3xl"
+                >
+                  <h3 className="text-white tracking-[0.2em] font-semibold mb-2 text-sm md:text-base uppercase">
+                    Bienvenidos a
+                  </h3>
+                  <h2 className="text-2xl md:text-4xl font-bold text-white mb-6 tracking-wide">
+                    PINTURARTE STUDIO
+                  </h2>
+
+                  <div className="w-48 h-px bg-zinc-700 mb-8"></div>
+
+                  <p className="text-2xl md:text-4xl font-extrabold text-purple-300 mb-6 leading-tight drop-shadow-md">
+                    Pequeñas figuras, grandes historias llenas de color.
+                  </p>
+
+                  <p className="text-lg md:text-xl text-gray-300 mb-6 leading-relaxed font-light">
+                    Descubre un mundo donde la creatividad cobra vida y cada detalle se transforma en arte.
+                  </p>
+
+                  <p className="text-xl md:text-2xl font-bold text-yellow-500 mb-10 flex items-center gap-2">
+                    Donde el color se convierte en magia. ✨
+                  </p>
+
+                  <button onClick={() => cambiarVista("catalogo")} className="bg-yellow-600 text-black px-8 py-3 rounded-full font-bold text-lg hover:bg-yellow-500 transition transform hover:scale-105 shadow-[0_0_15px_rgba(202,138,4,0.5)]">
+                    Ver Catálogo Completo
+                  </button>
+                </motion.div>
               </div>
             )}
 
