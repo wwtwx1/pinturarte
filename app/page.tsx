@@ -7,7 +7,7 @@ const productos = [
     id: 1,
     nombre: "Virgen María con Niño Jesús",
     descripcion: "Figura de yeso pintada a mano con detalles en dorado. Acabado brillante, ideal para regalo o colección religiosa.",
-    precio: 15000, // Poné los números sin puntos acá
+    precio: 15000,
     categoria: "Religiosos",
     imagen: "/img/virgen.jpg" 
   },
@@ -31,7 +31,7 @@ const productos = [
     id: 4,
     nombre: "Ángel San Miguel Arcángel",
     descripcion: "Figura de yeso con alas doradas y detalles en rojo y plata. Una pieza imponente para tu hogar.",
-    precio: 180000, // EJEMPLO: Acá va el precio sin puntos
+    precio: 180000,
     categoria: "Religiosos",
     imagen: "/img/angel.jpg"
   },
@@ -58,7 +58,6 @@ export default function Home() {
   const [esRegistro, setEsRegistro] = useState(false);
   const [mostrarBotonArriba, setMostrarBotonArriba] = useState(false);
   
-  // Estado para el formulario de contacto simulado
   const [mensajeEnviado, setMensajeEnviado] = useState(false);
 
   useEffect(() => {
@@ -86,16 +85,31 @@ export default function Home() {
 
   const cambiarVista = (vista: string) => {
     setVistaActual(vista);
-    setMensajeEnviado(false); // Resetea el form al cambiar de pestaña
+    setMensajeEnviado(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white font-sans flex flex-col overflow-hidden relative">
       
+      {/* BOTÓN FLOTANTE DE INSTAGRAM */}
+      <a 
+        href="https://www.instagram.com/pinturartestudio"
+        target="_blank" 
+        rel="noreferrer"
+        className="fixed bottom-24 left-8 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 text-white p-4 rounded-full shadow-[0_0_15px_rgba(236,72,153,0.6)] hover:scale-110 transition z-50 flex items-center justify-center"
+        title="Seguinos en Instagram"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+          <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+          <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+        </svg>
+      </a>
+
       {/* BOTÓN FLOTANTE DE WHATSAPP */}
       <a 
-        href="https://wa.me/573147376561" // CAMBIAR POR EL NÚMERO REAL (Código de país + área + número, sin 0 ni 15)
+        href="https://wa.me/573147376561"
         target="_blank" 
         rel="noreferrer"
         className="fixed bottom-8 left-8 bg-green-500 text-white p-4 rounded-full shadow-[0_0_15px_rgba(34,197,94,0.6)] hover:bg-green-400 hover:scale-110 transition z-50 flex items-center justify-center"
@@ -274,12 +288,9 @@ export default function Home() {
         </AnimatePresence>
       </main>
 
-      {/* FOOTER */}
+      {/* FOOTER ACTUALIZADO (Sin texto de Instagram) */}
       <footer className="bg-black py-8 text-center border-t border-zinc-800 mt-auto z-10">
         <p className="text-gray-500">© 2026 Pinturarte Studio. Todos los derechos reservados.</p>
-        <div className="mt-2 flex justify-center gap-4">
-          <a href="https://www.instagram.com/pinturartestudio" target="_blank" rel="noreferrer" className="text-yellow-500 hover:text-white transition">Instagram</a>
-        </div>
       </footer>
 
       {/* BOTÓN VOLVER ARRIBA */}
