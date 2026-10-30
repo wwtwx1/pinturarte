@@ -7,10 +7,8 @@ const formatearPrecio = (precio: number) => {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(precio);
 };
 
-// CORREO DEL ADMINISTRADOR
 const ADMIN_EMAIL = "xpipeyt@gmail.com"; 
 
-// DATOS DE LA SECCIÓN NOSOTROS
 const seccionesNosotros = [
   {
     id: "quienes",
@@ -50,15 +48,17 @@ export default function Home() {
 
   const [mensajeEnviado, setMensajeEnviado] = useState(false);
 
-  // Estados para el panel de administrador
-  const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: "", categoria: "Anime", imagen: "/img/goku.jpg" });
-  const [editandoPrecio, setEditandoPrecio] = useState<{ id: number, precio: string } | null>(null);
+  // --- ESTADOS DEL ADMIN ---
+  const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: "", categoria: "Anime", posicion: 1 });
+  const [imagenFile, setImagenFile] = useState<File | null>(null);
+  const [subiendo, setSubiendo] = useState(false);
+  const [productoEditando, setProductoEditando] = useState<any>(null);
 
-  // Estado para el acordeón de "Nosotros"
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
 
   const cargarProductos = async () => {
-    const { data, error } = await supabase.from('productos').select('*').order('id');
+    // Ahora ordenamos por la columna 'posicion'
+    const { data, error } = await supabase.from('productos').select('*').order('posicion', { ascending: true });
     if (data) setProductos(data);
     if (error) console.error("Error cargando productos:", error);
   };
@@ -100,9 +100,7 @@ export default function Home() {
         email, password, options: { data: { nombre_completo: nombreCompleto } }
       });
       if (error) setErrorAuth(error.message);
-      else {
-        setMensajeExito("¡Cuenta creada! Revisa tu correo electrónico para confirmar.");
-      }
+      else setMensajeExito("¡Cuenta creada! Revisa tu correo electrónico para confirmar.");
     } else if (vistaAuth === "login") {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) setErrorAuth(error.message);
@@ -121,29 +119,83 @@ export default function Home() {
     if (vistaActual === "admin") setVistaActual("inicio");
   };
 
+  // Subir imagen a Supabase Storage
+  const subirImagen = async (file: File) => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage.from('productos').upload(filePath, file);
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage.from('productos').getPublicUrl(filePath);
+    return data.publicUrl;
+  };
+
   const crearProducto = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.from('productos').insert([{
-      nombre: nuevoProducto.nombre,
-      descripcion: nuevoProducto.descripcion,
-      precio: Number(nuevoProducto.precio),
-      categoria: nuevoProducto.categoria,
-      imagen: nuevoProducto.imagen
-    }]);
-    if (error) alert("Error al crear: " + error.message);
-    else {
+    setSubiendo(true);
+    let urlImagen = "/img/goku.jpg"; // Imagen por defecto por si falla
+
+    try {
+      if (imagenFile) {
+        urlImagen = await subirImagen(imagenFile);
+      }
+
+      const { error } = await supabase.from('productos').insert([{
+        nombre: nuevoProducto.nombre,
+        descripcion: nuevoProducto.descripcion,
+        precio: Number(nuevoProducto.precio),
+        categoria: nuevoProducto.categoria,
+        posicion: Number(nuevoProducto.posicion),
+        imagen: urlImagen
+      }]);
+
+      if (error) throw error;
+
       alert("Producto creado exitosamente");
-      setNuevoProducto({ nombre: "", descripcion: "", precio: "", categoria: "Anime", imagen: "/img/goku.jpg" });
+      setNuevoProducto({ nombre: "", descripcion: "", precio: "", categoria: "Anime", posicion: 1 });
+      setImagenFile(null);
       cargarProductos();
+    } catch (error: any) {
+      alert("Error al crear: " + error.message);
+    } finally {
+      setSubiendo(false);
     }
   };
 
-  const actualizarPrecio = async (id: number, nuevoPrecio: string) => {
-    const { error } = await supabase.from('productos').update({ precio: Number(nuevoPrecio) }).eq('id', id);
-    if (error) alert("Error al actualizar: " + error.message);
-    else {
-      setEditandoPrecio(null);
+  const actualizarProducto = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!productoEditando) return;
+    setSubiendo(true);
+
+    try {
+      let urlImagen = productoEditando.imagen;
+      
+      // Si el usuario seleccionó una nueva imagen al editar, la subimos
+      if (imagenFile) {
+        urlImagen = await subirImagen(imagenFile);
+      }
+
+      const { error } = await supabase.from('productos').update({
+        nombre: productoEditando.nombre,
+        descripcion: productoEditando.descripcion,
+        precio: Number(productoEditando.precio),
+        categoria: productoEditando.categoria,
+        posicion: Number(productoEditando.posicion),
+        imagen: urlImagen
+      }).eq('id', productoEditando.id);
+
+      if (error) throw error;
+
+      alert("Producto actualizado");
+      setProductoEditando(null);
+      setImagenFile(null);
       cargarProductos();
+    } catch (error: any) {
+      alert("Error al editar: " + error.message);
+    } finally {
+      setSubiendo(false);
     }
   };
 
@@ -153,6 +205,13 @@ export default function Home() {
       if (error) alert("Error al eliminar: " + error.message);
       else cargarProductos();
     }
+  };
+
+  const moverPosicion = async (prod: any, direccion: 'subir' | 'bajar') => {
+    const nuevaPosicion = direccion === 'subir' ? prod.posicion - 1 : prod.posicion + 1;
+    // Actualizamos la posición del actual
+    await supabase.from('productos').update({ posicion: nuevaPosicion }).eq('id', prod.id);
+    cargarProductos();
   };
 
   const volverArriba = () => window.scrollTo({ top: 0, behavior: "smooth" });
@@ -250,6 +309,30 @@ export default function Home() {
         </div>
       )}
 
+      {/* MODAL DE EDICIÓN DE PRODUCTO */}
+      {productoEditando && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-full max-w-lg">
+            <h3 className="text-2xl font-bold mb-4 text-yellow-500">Editar Producto</h3>
+            <form onSubmit={actualizarProducto} className="flex flex-col gap-3">
+              <input type="text" placeholder="Nombre" value={productoEditando.nombre} onChange={(e) => setProductoEditando({...productoEditando, nombre: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+              <input type="number" placeholder="Precio" value={productoEditando.precio} onChange={(e) => setProductoEditando({...productoEditando, precio: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+              <input type="text" placeholder="Categoría" value={productoEditando.categoria} onChange={(e) => setProductoEditando({...productoEditando, categoria: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+              <input type="number" placeholder="Posición (ej: 1)" value={productoEditando.posicion} onChange={(e) => setProductoEditando({...productoEditando, posicion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+              <textarea placeholder="Descripción" value={productoEditando.descripcion} onChange={(e) => setProductoEditando({...productoEditando, descripcion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" rows={3}></textarea>
+              
+              <div className="text-sm text-gray-400">Dejar en blanco para mantener la imagen actual:</div>
+              <input type="file" accept="image/*" onChange={(e) => setImagenFile(e.target.files ? e.target.files[0] : null)} className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+
+              <div className="flex gap-2 mt-4">
+                <button type="submit" disabled={subiendo} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition">{subiendo ? "Guardando..." : "Guardar Cambios"}</button>
+                <button type="button" onClick={() => { setProductoEditando(null); setImagenFile(null); }} className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white font-bold py-2 rounded transition">Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL DEL CARRITO */}
       {mostrarCarrito && (
         <div className="absolute right-4 top-24 bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-80 z-50 animate-fade-in">
@@ -281,50 +364,17 @@ export default function Home() {
         <AnimatePresence mode="wait">
           <motion.div key={vistaActual} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.4, ease: "easeInOut" }} className="flex-grow flex flex-col w-full">
             
-            {/* VISTA: INICIO ACTUALIZADA CON NUEVO TEXTO Y DISEÑO */}
             {vistaActual === "inicio" && (
               <div className="min-h-[85vh] flex flex-col justify-center items-center text-center px-4 bg-gradient-to-b from-black to-zinc-900 py-12">
-                
-                {/* Imagen más pequeña para dar espacio al texto */}
-                <motion.img 
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8 }}
-                  src="/img/hero.png" 
-                  alt="Pinturarte Studio" 
-                  className="w-48 md:w-64 mb-6 drop-shadow-[0_0_15px_rgba(202,138,4,0.3)]" 
-                />
-
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 1, delay: 0.3 }}
-                  className="flex flex-col items-center max-w-3xl"
-                >
-                  <h3 className="text-white tracking-[0.2em] font-semibold mb-2 text-sm md:text-base uppercase">
-                    Bienvenidos a
-                  </h3>
-                  <h2 className="text-2xl md:text-4xl font-bold text-white mb-6 tracking-wide">
-                    PINTURARTE STUDIO
-                  </h2>
-
+                <motion.img initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} src="/img/hero.png" alt="Pinturarte Studio" className="w-48 md:w-64 mb-6 drop-shadow-[0_0_15px_rgba(202,138,4,0.3)]" />
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1, delay: 0.3 }} className="flex flex-col items-center max-w-3xl">
+                  <h3 className="text-white tracking-[0.2em] font-semibold mb-2 text-sm md:text-base uppercase">Bienvenidos a</h3>
+                  <h2 className="text-2xl md:text-4xl font-bold text-white mb-6 tracking-wide">PINTURARTE STUDIO</h2>
                   <div className="w-48 h-px bg-zinc-700 mb-8"></div>
-
-                  <p className="text-2xl md:text-4xl font-extrabold text-purple-300 mb-6 leading-tight drop-shadow-md">
-                    Pequeñas figuras, grandes historias llenas de color.
-                  </p>
-
-                  <p className="text-lg md:text-xl text-gray-300 mb-6 leading-relaxed font-light">
-                    Descubre un mundo donde la creatividad cobra vida y cada detalle se transforma en arte.
-                  </p>
-
-                  <p className="text-xl md:text-2xl font-bold text-yellow-500 mb-10 flex items-center gap-2">
-                    Donde el color se convierte en magia. ✨
-                  </p>
-
-                  <button onClick={() => cambiarVista("catalogo")} className="bg-yellow-600 text-black px-8 py-3 rounded-full font-bold text-lg hover:bg-yellow-500 transition transform hover:scale-105 shadow-[0_0_15px_rgba(202,138,4,0.5)]">
-                    Ver Catálogo Completo
-                  </button>
+                  <p className="text-2xl md:text-4xl font-extrabold text-purple-300 mb-6 leading-tight drop-shadow-md">Pequeñas figuras, grandes historias llenas de color.</p>
+                  <p className="text-lg md:text-xl text-gray-300 mb-6 leading-relaxed font-light">Descubre un mundo donde la creatividad cobra vida y cada detalle se transforma en arte.</p>
+                  <p className="text-xl md:text-2xl font-bold text-yellow-500 mb-10 flex items-center gap-2">Donde el color se convierte en magia. ✨</p>
+                  <button onClick={() => cambiarVista("catalogo")} className="bg-yellow-600 text-black px-8 py-3 rounded-full font-bold text-lg hover:bg-yellow-500 transition transform hover:scale-105 shadow-[0_0_15px_rgba(202,138,4,0.5)]">Ver Catálogo Completo</button>
                 </motion.div>
               </div>
             )}
@@ -420,29 +470,41 @@ export default function Home() {
               </section>
             )}
 
-            {/* VISTA: PANEL DE ADMINISTRADOR */}
+            {/* VISTA: PANEL DE ADMINISTRADOR ACTUALIZADO */}
             {vistaActual === "admin" && esAdmin && (
               <section className="py-12 px-4 max-w-6xl mx-auto w-full">
                 <h2 className="text-3xl font-bold mb-8 text-red-500">Panel de Administrador</h2>
                 
+                {/* Formulario de Nuevo Producto */}
                 <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl mb-10 shadow-lg">
                   <h3 className="text-xl font-bold mb-4 text-white">Agregar Nuevo Producto</h3>
                   <form onSubmit={crearProducto} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input type="text" placeholder="Nombre del producto" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
                     <input type="number" placeholder="Precio (solo números)" value={nuevoProducto.precio} onChange={(e) => setNuevoProducto({...nuevoProducto, precio: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
                     <input type="text" placeholder="Categoría" value={nuevoProducto.categoria} onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-                    <input type="text" placeholder="Ruta de la imagen (ej: /img/goku.jpg)" value={nuevoProducto.imagen} onChange={(e) => setNuevoProducto({...nuevoProducto, imagen: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                    <input type="number" placeholder="Posición (ej: 1)" value={nuevoProducto.posicion} onChange={(e) => setNuevoProducto({...nuevoProducto, posicion: Number(e.target.value)})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
                     <textarea placeholder="Descripción" value={nuevoProducto.descripcion} onChange={(e) => setNuevoProducto({...nuevoProducto, descripcion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white md:col-span-2" rows={2}></textarea>
-                    <button type="submit" className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded md:col-span-2 transition">Guardar Producto</button>
+                    
+                    {/* Input para Subir Imagen */}
+                    <div className="md:col-span-2">
+                      <label className="block text-sm text-gray-400 mb-1">Imagen del producto</label>
+                      <input type="file" accept="image/*" onChange={(e) => setImagenFile(e.target.files ? e.target.files[0] : null)} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white w-full" />
+                    </div>
+                    
+                    <button type="submit" disabled={subiendo} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded md:col-span-2 transition">
+                      {subiendo ? "Subiendo..." : "Guardar Producto"}
+                    </button>
                   </form>
                 </div>
 
+                {/* Tabla de Productos */}
                 <h3 className="text-xl font-bold mb-4 text-white">Productos Existentes</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-black text-yellow-500 border-b border-zinc-800">
-                        <th className="p-3">ID</th>
+                        <th className="p-3">Pos</th>
+                        <th className="p-3">Imagen</th>
                         <th className="p-3">Nombre</th>
                         <th className="p-3">Precio</th>
                         <th className="p-3 text-right">Acciones</th>
@@ -451,25 +513,24 @@ export default function Home() {
                     <tbody>
                       {productos.map((prod) => (
                         <tr key={prod.id} className="border-b border-zinc-800 hover:bg-zinc-900/50">
-                          <td className="p-3 text-gray-400">{prod.id}</td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-1">
+                              <span className="text-gray-400 w-6">{prod.posicion}</span>
+                              <div className="flex flex-col">
+                                <button onClick={() => moverPosicion(prod, 'subir')} className="text-gray-500 hover:text-white text-xs">▲</button>
+                                <button onClick={() => moverPosicion(prod, 'bajar')} className="text-gray-500 hover:text-white text-xs">▼</button>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            <img src={prod.imagen} alt={prod.nombre} className="w-12 h-12 object-cover rounded" />
+                          </td>
                           <td className="p-3">{prod.nombre}</td>
                           <td className="p-3">
-                            {editandoPrecio?.id === prod.id ? (
-                              <div className="flex items-center gap-2">
-                                <input 
-                                  type="number" 
-                                  value={editandoPrecio.precio} 
-                                  onChange={(e) => setEditandoPrecio({ id: prod.id, precio: e.target.value })} 
-                                  className="w-24 p-1 bg-zinc-800 border border-zinc-700 rounded text-white" 
-                                />
-                                <button onClick={() => actualizarPrecio(prod.id, editandoPrecio.precio)} className="text-green-500 hover:text-green-400 text-sm font-bold">Guardar</button>
-                              </div>
-                            ) : (
-                              <span className="text-yellow-500 font-bold">{formatearPrecio(prod.precio)}</span>
-                            )}
+                            <span className="text-yellow-500 font-bold">{formatearPrecio(prod.precio)}</span>
                           </td>
                           <td className="p-3 text-right">
-                            <button onClick={() => setEditandoPrecio({ id: prod.id, precio: prod.precio.toString() })} className="text-blue-400 hover:text-blue-300 text-sm mr-4 font-bold">Editar Precio</button>
+                            <button onClick={() => setProductoEditando(prod)} className="text-blue-400 hover:text-blue-300 text-sm mr-4 font-bold">Editar</button>
                             <button onClick={() => eliminarProducto(prod.id)} className="text-red-500 hover:text-red-400 text-sm font-bold">Eliminar</button>
                           </td>
                         </tr>
