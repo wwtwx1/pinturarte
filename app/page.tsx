@@ -19,12 +19,9 @@ export default function Home() {
   const [mostrarLogin, setMostrarLogin] = useState(false);
   const [vistaActual, setVistaActual] = useState("inicio");
   
-  // Estado para controlar la vista del formulario: 'login', 'registro', 'recuperar'
   const [vistaAuth, setVistaAuth] = useState("login"); 
-  
   const [mostrarBotonArriba, setMostrarBotonArriba] = useState(false);
   
-  // Estados del formulario
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nombreCompleto, setNombreCompleto] = useState("");
@@ -34,7 +31,6 @@ export default function Home() {
 
   const [mensajeEnviado, setMensajeEnviado] = useState(false);
 
-  // Estados para el panel de administrador
   const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: "", categoria: "Religiosos", imagen: "/img/virgen.jpg" });
   const [editandoPrecio, setEditandoPrecio] = useState<{ id: number, precio: string } | null>(null);
 
@@ -102,7 +98,6 @@ export default function Home() {
     if (vistaActual === "admin") setVistaActual("inicio");
   };
 
-  // Funciones de Administrador
   const crearProducto = async (e: React.FormEvent) => {
     e.preventDefault();
     const { error } = await supabase.from('productos').insert([{
@@ -193,7 +188,7 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* MODAL DE AUTENTICACIÓN (LOGIN / REGISTRO / RECUPERAR) */}
+      {/* MODAL DE AUTENTICACIÓN */}
       {mostrarLogin && (
         <div className="absolute right-4 top-24 bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-80 z-50 animate-fade-in">
           <h3 className="text-xl font-bold mb-4 text-yellow-500">
@@ -338,7 +333,6 @@ export default function Home() {
               <section className="py-12 px-4 max-w-6xl mx-auto w-full">
                 <h2 className="text-3xl font-bold mb-8 text-red-500">Panel de Administrador</h2>
                 
-                {/* Formulario de nuevo producto */}
                 <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl mb-10 shadow-lg">
                   <h3 className="text-xl font-bold mb-4 text-white">Agregar Nuevo Producto</h3>
                   <form onSubmit={crearProducto} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -351,7 +345,6 @@ export default function Home() {
                   </form>
                 </div>
 
-                {/* Lista de productos para editar/eliminar */}
                 <h3 className="text-xl font-bold mb-4 text-white">Productos Existentes</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
@@ -371,7 +364,12 @@ export default function Home() {
                           <td className="p-3">
                             {editandoPrecio?.id === prod.id ? (
                               <div className="flex items-center gap-2">
-                                <input type="number" value={editandoPrecio.precio} onChange={(e) => setEditandoPrecio({...editandoPrecio, precio: e.target.value})} className="w-24 p-1 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                                <input 
+                                  type="number" 
+                                  value={editandoPrecio.precio} 
+                                  onChange={(e) => setEditandoPrecio({ id: prod.id, precio: e.target.value })} 
+                                  className="w-24 p-1 bg-zinc-800 border border-zinc-700 rounded text-white" 
+                                />
                                 <button onClick={() => actualizarPrecio(prod.id, editandoPrecio.precio)} className="text-green-500 hover:text-green-400 text-sm font-bold">Guardar</button>
                               </div>
                             ) : (
