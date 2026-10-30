@@ -10,6 +10,25 @@ const formatearPrecio = (precio: number) => {
 // CORREO DEL ADMINISTRADOR
 const ADMIN_EMAIL = "xpipeyt@gmail.com"; 
 
+// DATOS DE LA SECCIÓN NOSOTROS
+const seccionesNosotros = [
+  {
+    id: "quienes",
+    titulo: "¿Quiénes somos?",
+    contenido: "En Pinturarte Studio creemos que el arte tiene el poder de transformar lo sencillo en algo extraordinario.\n\nSomos un emprendimiento creativo dedicado al arte y la pintura artesanal de figuras de yeso, donde cada pieza se convierte en una oportunidad para expresar imaginación, creatividad y emociones.\n\nNos apasiona dar vida a cada figura a través del color, los detalles y el trabajo hecho a mano. Creamos piezas únicas, personalizadas y llenas de encanto, pensadas para decorar, regalar, coleccionar y convertirse en recuerdos especiales.\n\nTambién nos dedicamos a la restauración artesanal, devolviéndoles vida y belleza a aquellas piezas que merecen una nueva oportunidad.\n\nMás que crear figuras, queremos ofrecer experiencias, despertar la creatividad y compartir la magia del arte hecho a mano.\n\nEn Pinturarte Studio, cada figura cuenta una historia pintada a mano. 🎨💜"
+  },
+  {
+    id: "mision",
+    titulo: "Nuestra Misión",
+    contenido: "En Pinturarte Studio tenemos como misión transformar figuras de yeso en pequeñas obras de arte, a través de la creatividad, la dedicación y el amor por los detalles.\n\nBuscamos ofrecer productos artesanales, personalizados y de calidad que transmitan emociones, despierten la imaginación y permitan a cada persona disfrutar del arte de una manera especial.\n\nQueremos que cada creación lleve consigo algo más que color: una historia, un sentimiento y un recuerdo."
+  },
+  {
+    id: "vision",
+    titulo: "Nuestra Visión",
+    contenido: "Ser una marca reconocida por su creatividad, calidad y pasión por el arte artesanal, convirtiéndonos en un referente en la pintura y personalización de figuras de yeso.\n\nAspiramos a crecer, innovar y llegar a más personas, llevando la magia del arte hecho a mano a nuevos espacios y creando experiencias que inspiren, conecten y permanezcan en el corazón de nuestros clientes.\n\nQueremos que Pinturarte Studio sea recordado no solo por sus creaciones, sino por las emociones y recuerdos que cada una representa."
+  }
+];
+
 export default function Home() {
   const [productos, setProductos] = useState<any[]>([]);
   const [usuario, setUsuario] = useState<any>(null);
@@ -31,8 +50,12 @@ export default function Home() {
 
   const [mensajeEnviado, setMensajeEnviado] = useState(false);
 
+  // Estados para el panel de administrador
   const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: "", categoria: "Religiosos", imagen: "/img/virgen.jpg" });
   const [editandoPrecio, setEditandoPrecio] = useState<{ id: number, precio: string } | null>(null);
+
+  // Estado para el acordeón de "Nosotros"
+  const [seccionAbierta, setSeccionAbierta] = useState<string | null>("quienes");
 
   const cargarProductos = async () => {
     const { data, error } = await supabase.from('productos').select('*').order('id');
@@ -296,12 +319,42 @@ export default function Home() {
               </section>
             )}
 
+            {/* VISTA: NOSOTROS CON DISEÑO ACORDEÓN */}
             {vistaActual === "nosotros" && (
-              <section className="py-20 px-4 max-w-4xl mx-auto text-center w-full">
-                <h2 className="text-4xl font-bold mb-8 text-yellow-500">Sobre Pinturarte Studio</h2>
-                <div className="bg-zinc-900 p-8 rounded-xl border border-zinc-800 shadow-lg">
-                  <p className="text-gray-300 text-lg leading-relaxed mb-6">En <strong className="text-white">Pinturarte Studio</strong> nos apasiona el arte de crear. Cada figura de yeso es moldeada y pintada a mano con dedicación, buscando que cada pieza sea única y de la más alta calidad para decorar tus espacios o regalar en ocasiones especiales.</p>
-                  <p className="text-gray-300 text-lg leading-relaxed">Atendemos a clientes de todo el país. Si buscas una pieza individual para tu hogar, o si representas a un local, event planner o comercio y necesitas una cotización especial por cantidad, no dudes en contactarnos. Adaptamos nuestros servicios a lo que necesitas.</p>
+              <section className="py-20 px-4 max-w-3xl mx-auto w-full">
+                <h2 className="text-4xl font-bold mb-12 text-center text-yellow-500">Sobre Nosotros</h2>
+                
+                <div className="flex flex-col gap-4">
+                  {seccionesNosotros.map((seccion) => (
+                    <div key={seccion.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg hover:border-yellow-600/30 transition">
+                      <button 
+                        onClick={() => setSeccionAbierta(seccionAbierta === seccion.id ? null : seccion.id)}
+                        className="w-full p-6 text-left flex justify-between items-center bg-zinc-900 hover:bg-zinc-800/50 transition"
+                      >
+                        <h3 className="text-2xl font-bold text-yellow-500">{seccion.titulo}</h3>
+                        <motion.div animate={{ rotate: seccionAbierta === seccion.id ? 180 : 0 }}>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6 text-yellow-500">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                          </svg>
+                        </motion.div>
+                      </button>
+                      
+                      <AnimatePresence>
+                        {seccionAbierta === seccion.id && (
+                          <motion.div 
+                            initial={{ height: 0, opacity: 0 }} 
+                            animate={{ height: "auto", opacity: 1 }} 
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <div className="p-6 pt-0 text-gray-300 leading-relaxed whitespace-pre-line border-t border-zinc-800/50 mt-2">
+                              {seccion.contenido}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ))}
                 </div>
               </section>
             )}
