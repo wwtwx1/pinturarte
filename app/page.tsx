@@ -54,8 +54,8 @@ export default function Home() {
   const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: "", categoria: "Religiosos", imagen: "/img/virgen.jpg" });
   const [editandoPrecio, setEditandoPrecio] = useState<{ id: number, precio: string } | null>(null);
 
-  // Estado para el acordeón de "Nosotros"
-  const [seccionAbierta, setSeccionAbierta] = useState<string | null>("quienes");
+  // Estado para el acordeón de "Nosotros" (Inicia en null para que esté cerrado)
+  const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
 
   const cargarProductos = async () => {
     const { data, error } = await supabase.from('productos').select('*').order('id');
