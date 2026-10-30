@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Claves puestas directamente para evitar configurar Vercel
+const supabaseUrl = "https://cjwsdnddyxioqftxpmog.supabase.co";
+const supabaseKey = "sb_publishable_ND_cgDdkm42yeo-MMjiARA_Xts9mRzf";
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
