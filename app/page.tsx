@@ -36,6 +36,9 @@ export default function Home() {
   const [mostrarLogin, setMostrarLogin] = useState(false);
   const [vistaActual, setVistaActual] = useState("inicio");
   
+  // ESTADO PARA EL MENÚ MÓVIL
+  const [menuAbierto, setMenuAbierto] = useState(false);
+
   const [vistaAuth, setVistaAuth] = useState("login"); 
   const [mostrarBotonArriba, setMostrarBotonArriba] = useState(false);
   
@@ -57,7 +60,6 @@ export default function Home() {
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
 
   const cargarProductos = async () => {
-    // Ahora ordenamos por la columna 'posicion'
     const { data, error } = await supabase.from('productos').select('*').order('posicion', { ascending: true });
     if (data) setProductos(data);
     if (error) console.error("Error cargando productos:", error);
@@ -117,9 +119,9 @@ export default function Home() {
     await supabase.auth.signOut();
     setUsuario(null);
     if (vistaActual === "admin") setVistaActual("inicio");
+    setMenuAbierto(false);
   };
 
-  // Subir imagen a Supabase Storage
   const subirImagen = async (file: File) => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
@@ -128,14 +130,14 @@ export default function Home() {
     const { error: uploadError } = await supabase.storage.from('productos').upload(filePath, file);
     if (uploadError) throw uploadError;
 
-    const { data } = supabase.storage.from('productos').getPublicUrl(filePath);
+    const { data } = await supabase.storage.from('productos').getPublicUrl(filePath);
     return data.publicUrl;
   };
 
   const crearProducto = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubiendo(true);
-    let urlImagen = "/img/goku.jpg"; // Imagen por defecto por si falla
+    let urlImagen = "/img/goku.jpg"; 
 
     try {
       if (imagenFile) {
@@ -172,7 +174,6 @@ export default function Home() {
     try {
       let urlImagen = productoEditando.imagen;
       
-      // Si el usuario seleccionó una nueva imagen al editar, la subimos
       if (imagenFile) {
         urlImagen = await subirImagen(imagenFile);
       }
@@ -209,7 +210,6 @@ export default function Home() {
 
   const moverPosicion = async (prod: any, direccion: 'subir' | 'bajar') => {
     const nuevaPosicion = direccion === 'subir' ? prod.posicion - 1 : prod.posicion + 1;
-    // Actualizamos la posición del actual
     await supabase.from('productos').update({ posicion: nuevaPosicion }).eq('id', prod.id);
     cargarProductos();
   };
@@ -227,6 +227,7 @@ export default function Home() {
   const cambiarVista = (vista: string) => {
     setVistaActual(vista);
     setMensajeEnviado(false);
+    setMenuAbierto(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -236,75 +237,125 @@ export default function Home() {
     <div className="min-h-screen bg-zinc-950 text-white font-sans flex flex-col overflow-hidden relative">
       
       {/* BOTONES FLOTANTES */}
-      <a href="https://www.instagram.com/pinturartestudio" target="_blank" rel="noreferrer" className="fixed bottom-24 left-8 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 text-white p-4 rounded-full shadow-[0_0_15px_rgba(236,72,153,0.6)] hover:scale-110 transition z-50 flex items-center justify-center" title="Instagram">
-        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+      <a href="https://www.instagram.com/pinturartestudio" target="_blank" rel="noreferrer" className="fixed bottom-24 left-4 md:left-8 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 text-white p-3 md:p-4 rounded-full shadow-[0_0_15px_rgba(236,72,153,0.6)] hover:scale-110 transition z-50 flex items-center justify-center" title="Instagram">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
       </a>
-      <a href="https://wa.me/573147376561" target="_blank" rel="noreferrer" className="fixed bottom-8 left-8 bg-green-500 text-white p-4 rounded-full shadow-[0_0_15px_rgba(34,197,94,0.6)] hover:bg-green-400 hover:scale-110 transition z-50 flex items-center justify-center" title="WhatsApp">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" fill="currentColor" className="w-7 h-7"><path d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3L72 359.2l-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7.9-6.9-.5-9.7-1.4-2.8-12.5-30.1-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z"/></svg>
+      <a href="https://wa.me/573147376561" target="_blank" rel="noreferrer" className="fixed bottom-6 left-4 md:bottom-8 md:left-8 bg-green-500 text-white p-3 md:p-4 rounded-full shadow-[0_0_15px_rgba(34,197,94,0.6)] hover:bg-green-400 hover:scale-110 transition z-50 flex items-center justify-center" title="WhatsApp">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" fill="currentColor" className="w-6 h-6 md:w-7 md:h-7"><path d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3L72 359.2l-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7.9-6.9-.5-9.7-1.4-2.8-12.5-30.1-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z"/></svg>
       </a>
 
-      {/* NAVBAR */}
-      <nav className="bg-black p-2 md:p-4 flex justify-between items-center border-b border-yellow-600/30 sticky top-0 z-40 shadow-lg">
-        <img src="/img/logo.png" alt="Pinturarte Studio" className="h-16 md:h-20 w-auto object-contain cursor-pointer hover:scale-105 transition" onClick={() => cambiarVista("inicio")} />
-        
-        <div className="flex gap-3 md:gap-6 items-center text-sm md:text-base pr-2">
-          <button onClick={() => cambiarVista("inicio")} className={`${vistaActual === 'inicio' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition hidden sm:block`}>Inicio</button>
-          <button onClick={() => cambiarVista("catalogo")} className={`${vistaActual === 'catalogo' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition`}>Catálogo</button>
-          <button onClick={() => cambiarVista("nosotros")} className={`${vistaActual === 'nosotros' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition hidden sm:block`}>Nosotros</button>
-          <button onClick={() => cambiarVista("contacto")} className={`${vistaActual === 'contacto' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition hidden sm:block`}>Contacto</button>
+      {/* NAVBAR RESPONSIVO */}
+      <nav className="bg-black p-2 md:p-4 border-b border-yellow-600/30 sticky top-0 z-40 shadow-lg">
+        <div className="flex justify-between items-center w-full">
+          <img src="/img/logo.png" alt="Pinturarte Studio" className="h-12 md:h-20 w-auto object-contain cursor-pointer hover:scale-105 transition" onClick={() => cambiarVista("inicio")} />
           
-          {esAdmin && (
-            <button onClick={() => cambiarVista("admin")} className={`${vistaActual === 'admin' ? 'text-red-500 font-bold' : 'hover:text-red-500 text-red-400'} transition hidden md:block border border-red-500/30 px-2 rounded`}>Admin</button>
-          )}
+          {/* BOTONES DE ESCRITORIO */}
+          <div className="hidden md:flex gap-4 md:gap-6 items-center text-sm md:text-base pr-2">
+            <button onClick={() => cambiarVista("inicio")} className={`${vistaActual === 'inicio' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition`}>Inicio</button>
+            <button onClick={() => cambiarVista("catalogo")} className={`${vistaActual === 'catalogo' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition`}>Catálogo</button>
+            <button onClick={() => cambiarVista("nosotros")} className={`${vistaActual === 'nosotros' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition`}>Nosotros</button>
+            <button onClick={() => cambiarVista("contacto")} className={`${vistaActual === 'contacto' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition`}>Contacto</button>
+            
+            {esAdmin && (
+              <button onClick={() => cambiarVista("admin")} className={`${vistaActual === 'admin' ? 'text-red-500 font-bold' : 'hover:text-red-500 text-red-400'} transition border border-red-500/30 px-2 rounded`}>Admin</button>
+            )}
 
-          {usuario ? (
-            <div className="flex items-center gap-3 border-l border-zinc-700 pl-3">
-              <span className="text-yellow-500 text-xs hidden md:block">Hola, {usuario.user_metadata?.nombre_completo || 'Cliente'}</span>
-              <button onClick={cerrarSesion} className="hover:text-red-500 transition font-bold text-xs sm:text-sm">Salir</button>
-            </div>
-          ) : (
-            <button onClick={() => { setMostrarLogin(!mostrarLogin); setMostrarCarrito(false); setVistaAuth("login"); setErrorAuth(""); setMensajeExito(""); }} className="hover:text-yellow-500 transition font-bold border-l border-zinc-700 pl-3 md:pl-4 text-xs sm:text-sm">Mi Cuenta</button>
-          )}
+            {usuario ? (
+              <div className="flex items-center gap-3 border-l border-zinc-700 pl-3">
+                <span className="text-yellow-500 text-xs">Hola, {usuario.user_metadata?.nombre_completo?.split(' ')[0] || 'Cliente'}</span>
+                <button onClick={cerrarSesion} className="hover:text-red-500 transition font-bold text-xs">Salir</button>
+              </div>
+            ) : (
+              <button onClick={() => { setMostrarLogin(true); setMostrarCarrito(false); setVistaAuth("login"); setErrorAuth(""); setMensajeExito(""); }} className="hover:text-yellow-500 transition font-bold border-l border-zinc-700 pl-4 text-sm">Mi Cuenta</button>
+            )}
 
-          <button onClick={() => { setMostrarCarrito(!mostrarCarrito); setMostrarLogin(false); }} className="bg-yellow-600 text-black px-2 md:px-4 py-2 rounded font-bold hover:bg-yellow-500 transition text-xs md:text-base">Carrito ({carrito.length})</button>
+            <button onClick={() => { setMostrarCarrito(!mostrarCarrito); setMostrarLogin(false); }} className="bg-yellow-600 text-black px-4 py-2 rounded font-bold hover:bg-yellow-500 transition">Carrito ({carrito.length})</button>
+          </div>
+
+          {/* BOTONES MÓVILES */}
+          <div className="flex md:hidden items-center gap-2">
+            <button onClick={() => { setMostrarCarrito(!mostrarCarrito); setMostrarLogin(false); }} className="bg-yellow-600 text-black px-3 py-1 text-xs rounded font-bold">Carrito ({carrito.length})</button>
+            <button onClick={() => setMenuAbierto(!menuAbierto)} className="text-white p-2">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7">
+                {menuAbierto ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                )}
+              </svg>
+            </button>
+          </div>
         </div>
+
+        {/* MENÚ DESPLEGABLE MÓVIL */}
+        <AnimatePresence>
+          {menuAbierto && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }} 
+              animate={{ opacity: 1, height: "auto" }} 
+              exit={{ opacity: 0, height: 0 }}
+              className="md:hidden mt-2 bg-zinc-900 rounded-lg overflow-hidden flex flex-col border border-zinc-800"
+            >
+              <button onClick={() => cambiarVista("inicio")} className="p-3 text-left border-b border-zinc-800 hover:bg-zinc-800">Inicio</button>
+              <button onClick={() => cambiarVista("catalogo")} className="p-3 text-left border-b border-zinc-800 hover:bg-zinc-800">Catálogo</button>
+              <button onClick={() => cambiarVista("nosotros")} className="p-3 text-left border-b border-zinc-800 hover:bg-zinc-800">Nosotros</button>
+              <button onClick={() => cambiarVista("contacto")} className="p-3 text-left border-b border-zinc-800 hover:bg-zinc-800">Contacto</button>
+              
+              {esAdmin && (
+                <button onClick={() => cambiarVista("admin")} className="p-3 text-left border-b border-zinc-800 text-red-400 font-bold hover:bg-zinc-800">Panel Admin</button>
+              )}
+              
+              {usuario ? (
+                <div className="flex flex-col p-3 bg-black">
+                  <span className="text-yellow-500 text-sm mb-2">Hola, {usuario.user_metadata?.nombre_completo || 'Cliente'}</span>
+                  <button onClick={cerrarSesion} className="text-left text-red-400 font-bold hover:text-red-300">Cerrar Sesión</button>
+                </div>
+              ) : (
+                <button onClick={() => { setMostrarLogin(true); setMenuAbierto(false); setVistaAuth("login"); setErrorAuth(""); setMensajeExito(""); }} className="p-3 text-left bg-black font-bold text-yellow-500 hover:text-yellow-400">Mi Cuenta / Ingresar</button>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
 
       {/* MODAL DE AUTENTICACIÓN */}
       {mostrarLogin && (
-        <div className="absolute right-4 top-24 bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-80 z-50 animate-fade-in">
-          <h3 className="text-xl font-bold mb-4 text-yellow-500">
-            {vistaAuth === "login" ? "Iniciar Sesión" : vistaAuth === "registro" ? "Crear Cuenta" : "Recuperar Contraseña"}
-          </h3>
-          
-          {errorAuth && <div className="bg-red-500/20 text-red-400 p-2 rounded mb-3 text-xs">{errorAuth}</div>}
-          {mensajeExito && <div className="bg-green-500/20 text-green-400 p-2 rounded mb-3 text-xs">{mensajeExito}</div>}
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-full max-w-sm">
+            <h3 className="text-xl font-bold mb-4 text-yellow-500">
+              {vistaAuth === "login" ? "Iniciar Sesión" : vistaAuth === "registro" ? "Crear Cuenta" : "Recuperar Contraseña"}
+            </h3>
+            
+            {errorAuth && <div className="bg-red-500/20 text-red-400 p-2 rounded mb-3 text-xs">{errorAuth}</div>}
+            {mensajeExito && <div className="bg-green-500/20 text-green-400 p-2 rounded mb-3 text-xs">{mensajeExito}</div>}
 
-          <form onSubmit={manejarAuth} className="flex flex-col gap-3 mb-4">
-            {vistaAuth === "registro" && (
-              <input type="text" placeholder="Nombre completo" value={nombreCompleto} onChange={(e) => setNombreCompleto(e.target.value)} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" />
-            )}
-            <input type="email" placeholder="Correo electrónico" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" />
+            <form onSubmit={manejarAuth} className="flex flex-col gap-3 mb-4">
+              {vistaAuth === "registro" && (
+                <input type="text" placeholder="Nombre completo" value={nombreCompleto} onChange={(e) => setNombreCompleto(e.target.value)} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" />
+              )}
+              <input type="email" placeholder="Correo electrónico" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" />
+              
+              {vistaAuth !== "recuperar" && (
+                <input type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" />
+              )}
+              
+              <button type="submit" disabled={cargando} className="w-full bg-yellow-600 text-black py-2 rounded font-bold hover:bg-yellow-500 transition disabled:opacity-50 mt-2">
+                {cargando ? "Procesando..." : vistaAuth === "login" ? "Ingresar" : vistaAuth === "registro" ? "Registrarse" : "Enviar Enlace"}
+              </button>
+            </form>
             
-            {vistaAuth !== "recuperar" && (
-              <input type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" />
-            )}
-            
-            <button type="submit" disabled={cargando} className="w-full bg-yellow-600 text-black py-2 rounded font-bold hover:bg-yellow-500 transition disabled:opacity-50 mt-2">
-              {cargando ? "Procesando..." : vistaAuth === "login" ? "Ingresar" : vistaAuth === "registro" ? "Registrarse" : "Enviar Enlace"}
-            </button>
-          </form>
-          
-          <div className="flex flex-col gap-2 text-xs text-gray-400">
-            {vistaAuth === "login" && (
-              <>
-                <button onClick={() => { setVistaAuth("registro"); setErrorAuth(""); setMensajeExito(""); }} className="hover:text-white transition underline text-left">¿No tienes cuenta? Regístrate aquí</button>
-                <button onClick={() => { setVistaAuth("recuperar"); setErrorAuth(""); setMensajeExito(""); }} className="hover:text-white transition underline text-left">Olvidé mi contraseña</button>
-              </>
-            )}
-            {vistaAuth !== "login" && (
-              <button onClick={() => { setVistaAuth("login"); setErrorAuth(""); setMensajeExito(""); }} className="hover:text-white transition underline text-left">Volver al inicio de sesión</button>
-            )}
+            <div className="flex flex-col gap-2 text-xs text-gray-400">
+              {vistaAuth === "login" && (
+                <>
+                  <button onClick={() => { setVistaAuth("registro"); setErrorAuth(""); setMensajeExito(""); }} className="hover:text-white transition underline text-left">¿No tienes cuenta? Regístrate aquí</button>
+                  <button onClick={() => { setVistaAuth("recuperar"); setErrorAuth(""); setMensajeExito(""); }} className="hover:text-white transition underline text-left">Olvidé mi contraseña</button>
+                </>
+              )}
+              {vistaAuth !== "login" && (
+                <button onClick={() => { setVistaAuth("login"); setErrorAuth(""); setMensajeExito(""); }} className="hover:text-white transition underline text-left">Volver al inicio de sesión</button>
+              )}
+              <button onClick={() => setMostrarLogin(false)} className="mt-2 text-center text-gray-500 hover:text-white">Cerrar ventana</button>
+            </div>
           </div>
         </div>
       )}
@@ -312,7 +363,7 @@ export default function Home() {
       {/* MODAL DE EDICIÓN DE PRODUCTO */}
       {productoEditando && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-full max-w-lg">
+          <div className="bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-2xl font-bold mb-4 text-yellow-500">Editar Producto</h3>
             <form onSubmit={actualizarProducto} className="flex flex-col gap-3">
               <input type="text" placeholder="Nombre" value={productoEditando.nombre} onChange={(e) => setProductoEditando({...productoEditando, nombre: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
@@ -321,7 +372,7 @@ export default function Home() {
               <input type="number" placeholder="Posición (ej: 1)" value={productoEditando.posicion} onChange={(e) => setProductoEditando({...productoEditando, posicion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
               <textarea placeholder="Descripción" value={productoEditando.descripcion} onChange={(e) => setProductoEditando({...productoEditando, descripcion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" rows={3}></textarea>
               
-              <div className="text-sm text-gray-400">Dejar en blanco para mantener la imagen actual:</div>
+              <div className="text-sm text-gray-400 mt-2">Dejar en blanco para mantener la imagen actual:</div>
               <input type="file" accept="image/*" onChange={(e) => setImagenFile(e.target.files ? e.target.files[0] : null)} className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
 
               <div className="flex gap-2 mt-4">
@@ -335,27 +386,29 @@ export default function Home() {
 
       {/* MODAL DEL CARRITO */}
       {mostrarCarrito && (
-        <div className="absolute right-4 top-24 bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-80 z-50 animate-fade-in">
-          <h3 className="text-xl font-bold mb-4 text-yellow-500">Tu Carrito</h3>
-          {carrito.length === 0 ? (
-            <p className="text-gray-400">El carrito está vacío.</p>
-          ) : (
-            <ul className="mb-4 max-h-60 overflow-y-auto pr-2">
-              {carrito.map((item, index) => (
-                <li key={index} className="flex justify-between items-center text-sm mb-2 border-b border-zinc-800 pb-2">
-                  <span className="w-1/2 truncate">{item.nombre}</span>
-                  <span>{formatearPrecio(item.precio)}</span>
-                  <button onClick={() => eliminarDelCarrito(index)} className="text-red-500 hover:text-red-400 font-bold ml-2">✕</button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="flex justify-between font-bold text-lg mb-4 text-yellow-500 border-t border-zinc-700 pt-2">
-            <span>Total:</span>
-            <span>{formatearPrecio(total)}</span>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-full max-w-sm">
+            <h3 className="text-xl font-bold mb-4 text-yellow-500">Tu Carrito</h3>
+            {carrito.length === 0 ? (
+              <p className="text-gray-400">El carrito está vacío.</p>
+            ) : (
+              <ul className="mb-4 max-h-60 overflow-y-auto pr-2">
+                {carrito.map((item, index) => (
+                  <li key={index} className="flex justify-between items-center text-sm mb-2 border-b border-zinc-800 pb-2">
+                    <span className="w-1/2 truncate">{item.nombre}</span>
+                    <span>{formatearPrecio(item.precio)}</span>
+                    <button onClick={() => eliminarDelCarrito(index)} className="text-red-500 hover:text-red-400 font-bold ml-2">✕</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex justify-between font-bold text-lg mb-4 text-yellow-500 border-t border-zinc-700 pt-2">
+              <span>Total:</span>
+              <span>{formatearPrecio(total)}</span>
+            </div>
+            <button onClick={() => alert("¡Próximamente pasarela de pagos!")} className="w-full bg-green-600 hover:bg-green-500 text-white py-2 rounded font-bold transition">Finalizar Compra</button>
+            <button onClick={() => setMostrarCarrito(false)} className="w-full mt-2 text-xs text-gray-400 hover:text-white">Cerrar</button>
           </div>
-          <button onClick={() => alert("¡Próximamente pasarela de pagos!")} className="w-full bg-green-600 hover:bg-green-500 text-white py-2 rounded font-bold transition">Finalizar Compra</button>
-          <button onClick={() => setMostrarCarrito(false)} className="w-full mt-2 text-xs text-gray-400 hover:text-white">Cerrar</button>
         </div>
       )}
 
@@ -475,7 +528,6 @@ export default function Home() {
               <section className="py-12 px-4 max-w-6xl mx-auto w-full">
                 <h2 className="text-3xl font-bold mb-8 text-red-500">Panel de Administrador</h2>
                 
-                {/* Formulario de Nuevo Producto */}
                 <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl mb-10 shadow-lg">
                   <h3 className="text-xl font-bold mb-4 text-white">Agregar Nuevo Producto</h3>
                   <form onSubmit={crearProducto} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -485,7 +537,6 @@ export default function Home() {
                     <input type="number" placeholder="Posición (ej: 1)" value={nuevoProducto.posicion} onChange={(e) => setNuevoProducto({...nuevoProducto, posicion: Number(e.target.value)})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
                     <textarea placeholder="Descripción" value={nuevoProducto.descripcion} onChange={(e) => setNuevoProducto({...nuevoProducto, descripcion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white md:col-span-2" rows={2}></textarea>
                     
-                    {/* Input para Subir Imagen */}
                     <div className="md:col-span-2">
                       <label className="block text-sm text-gray-400 mb-1">Imagen del producto</label>
                       <input type="file" accept="image/*" onChange={(e) => setImagenFile(e.target.files ? e.target.files[0] : null)} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white w-full" />
@@ -497,16 +548,15 @@ export default function Home() {
                   </form>
                 </div>
 
-                {/* Tabla de Productos */}
                 <h3 className="text-xl font-bold mb-4 text-white">Productos Existentes</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-black text-yellow-500 border-b border-zinc-800">
                         <th className="p-3">Pos</th>
-                        <th className="p-3">Imagen</th>
+                        <th className="p-3 hidden md:table-cell">Imagen</th>
                         <th className="p-3">Nombre</th>
-                        <th className="p-3">Precio</th>
+                        <th className="p-3 hidden md:table-cell">Precio</th>
                         <th className="p-3 text-right">Acciones</th>
                       </tr>
                     </thead>
@@ -522,15 +572,18 @@ export default function Home() {
                               </div>
                             </div>
                           </td>
-                          <td className="p-3">
+                          <td className="p-3 hidden md:table-cell">
                             <img src={prod.imagen} alt={prod.nombre} className="w-12 h-12 object-cover rounded" />
                           </td>
-                          <td className="p-3">{prod.nombre}</td>
                           <td className="p-3">
+                            {prod.nombre}
+                            <div className="md:hidden text-yellow-500 font-bold text-sm mt-1">{formatearPrecio(prod.precio)}</div>
+                          </td>
+                          <td className="p-3 hidden md:table-cell">
                             <span className="text-yellow-500 font-bold">{formatearPrecio(prod.precio)}</span>
                           </td>
-                          <td className="p-3 text-right">
-                            <button onClick={() => setProductoEditando(prod)} className="text-blue-400 hover:text-blue-300 text-sm mr-4 font-bold">Editar</button>
+                          <td className="p-3 text-right flex flex-col md:flex-row items-end md:items-center justify-end gap-2">
+                            <button onClick={() => setProductoEditando(prod)} className="text-blue-400 hover:text-blue-300 text-sm font-bold">Editar</button>
                             <button onClick={() => eliminarProducto(prod.id)} className="text-red-500 hover:text-red-400 text-sm font-bold">Eliminar</button>
                           </td>
                         </tr>
@@ -550,7 +603,7 @@ export default function Home() {
 
       <AnimatePresence>
         {mostrarBotonArriba && (
-          <motion.button initial={{ opacity: 0, scale: 0, y: 50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0, y: 50 }} transition={{ duration: 0.3 }} onClick={volverArriba} className="fixed bottom-8 right-8 bg-yellow-600 text-black p-4 rounded-full shadow-[0_0_15px_rgba(202,138,4,0.6)] hover:bg-yellow-500 hover:scale-110 transition z-50 flex items-center justify-center" title="Volver arriba">
+          <motion.button initial={{ opacity: 0, scale: 0, y: 50 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0, y: 50 }} transition={{ duration: 0.3 }} onClick={volverArriba} className="fixed bottom-8 right-8 bg-yellow-600 text-black p-4 rounded-full shadow-[0_0_15px_rgba(202,138,4,0.6)] hover:bg-yellow-500 hover:scale-110 transition z-40 flex items-center justify-center" title="Volver arriba">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>
           </motion.button>
         )}
