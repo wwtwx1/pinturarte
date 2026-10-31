@@ -36,7 +36,6 @@ export default function Home() {
   const [mostrarLogin, setMostrarLogin] = useState(false);
   const [vistaActual, setVistaActual] = useState("inicio");
   
-  // ESTADO PARA EL MENÚ MÓVIL
   const [menuAbierto, setMenuAbierto] = useState(false);
 
   const [vistaAuth, setVistaAuth] = useState("login"); 
@@ -51,7 +50,6 @@ export default function Home() {
 
   const [mensajeEnviado, setMensajeEnviado] = useState(false);
 
-  // --- ESTADOS DEL ADMIN ---
   const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: "", categoria: "Anime", posicion: 1 });
   const [imagenFile, setImagenFile] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
@@ -130,7 +128,7 @@ export default function Home() {
     const { error: uploadError } = await supabase.storage.from('productos').upload(filePath, file);
     if (uploadError) throw uploadError;
 
-    const { data } = await supabase.storage.from('productos').getPublicUrl(filePath);
+    const { data } = supabase.storage.from('productos').getPublicUrl(filePath);
     return data.publicUrl;
   };
 
@@ -232,6 +230,7 @@ export default function Home() {
   };
 
   const esAdmin = usuario?.email === ADMIN_EMAIL;
+  const nombreMostrar = usuario?.user_metadata?.nombre_completo?.split(' ')[0] || usuario?.email?.split('@')[0] || 'Cliente';
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white font-sans flex flex-col overflow-hidden relative">
@@ -250,11 +249,12 @@ export default function Home() {
           <img src="/img/logo.png" alt="Pinturarte Studio" className="h-12 md:h-20 w-auto object-contain cursor-pointer hover:scale-105 transition" onClick={() => cambiarVista("inicio")} />
           
           {/* BOTONES DE ESCRITORIO */}
-          <div className="hidden md:flex gap-4 md:gap-6 items-center text-sm md:text-base pr-2">
+          <div className="hidden md:flex gap-3 md:gap-5 items-center text-sm md:text-base pr-2">
             <button onClick={() => cambiarVista("inicio")} className={`${vistaActual === 'inicio' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition`}>Inicio</button>
             <button onClick={() => cambiarVista("catalogo")} className={`${vistaActual === 'catalogo' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition`}>Catálogo</button>
             <button onClick={() => cambiarVista("nosotros")} className={`${vistaActual === 'nosotros' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition`}>Nosotros</button>
             <button onClick={() => cambiarVista("contacto")} className={`${vistaActual === 'contacto' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition`}>Contacto</button>
+            <button onClick={() => cambiarVista("curso")} className={`${vistaActual === 'curso' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition`}>Curso</button>
             
             {esAdmin && (
               <button onClick={() => cambiarVista("admin")} className={`${vistaActual === 'admin' ? 'text-red-500 font-bold' : 'hover:text-red-500 text-red-400'} transition border border-red-500/30 px-2 rounded`}>Admin</button>
@@ -262,11 +262,11 @@ export default function Home() {
 
             {usuario ? (
               <div className="flex items-center gap-3 border-l border-zinc-700 pl-3">
-                <span className="text-yellow-500 text-xs">Hola, {usuario.user_metadata?.nombre_completo?.split(' ')[0] || 'Cliente'}</span>
+                <span className="text-yellow-500 text-xs">Hola, {nombreMostrar}</span>
                 <button onClick={cerrarSesion} className="hover:text-red-500 transition font-bold text-xs">Salir</button>
               </div>
             ) : (
-              <button onClick={() => { setMostrarLogin(true); setMostrarCarrito(false); setVistaAuth("login"); setErrorAuth(""); setMensajeExito(""); }} className="hover:text-yellow-500 transition font-bold border-l border-zinc-700 pl-4 text-sm">Mi Cuenta</button>
+              <button onClick={() => { setMostrarLogin(true); setMostrarCarrito(false); setVistaAuth("login"); setErrorAuth(""); setMensajeExito(""); }} className="hover:text-yellow-500 transition font-bold border-l border-zinc-700 pl-3 text-sm">Mi Cuenta</button>
             )}
 
             <button onClick={() => { setMostrarCarrito(!mostrarCarrito); setMostrarLogin(false); }} className="bg-yellow-600 text-black px-4 py-2 rounded font-bold hover:bg-yellow-500 transition">Carrito ({carrito.length})</button>
@@ -300,6 +300,7 @@ export default function Home() {
               <button onClick={() => cambiarVista("catalogo")} className="p-3 text-left border-b border-zinc-800 hover:bg-zinc-800">Catálogo</button>
               <button onClick={() => cambiarVista("nosotros")} className="p-3 text-left border-b border-zinc-800 hover:bg-zinc-800">Nosotros</button>
               <button onClick={() => cambiarVista("contacto")} className="p-3 text-left border-b border-zinc-800 hover:bg-zinc-800">Contacto</button>
+              <button onClick={() => cambiarVista("curso")} className="p-3 text-left border-b border-zinc-800 hover:bg-zinc-800">Curso</button>
               
               {esAdmin && (
                 <button onClick={() => cambiarVista("admin")} className="p-3 text-left border-b border-zinc-800 text-red-400 font-bold hover:bg-zinc-800">Panel Admin</button>
@@ -307,7 +308,7 @@ export default function Home() {
               
               {usuario ? (
                 <div className="flex flex-col p-3 bg-black">
-                  <span className="text-yellow-500 text-sm mb-2">Hola, {usuario.user_metadata?.nombre_completo || 'Cliente'}</span>
+                  <span className="text-yellow-500 text-sm mb-2">Hola, {nombreMostrar}</span>
                   <button onClick={cerrarSesion} className="text-left text-red-400 font-bold hover:text-red-300">Cerrar Sesión</button>
                 </div>
               ) : (
@@ -519,6 +520,27 @@ export default function Home() {
                       <button type="submit" className="bg-yellow-600 text-black py-3 rounded font-bold hover:bg-yellow-500 transition mt-2">Enviar Mensaje</button>
                     </form>
                   )}
+                </div>
+              </section>
+            )}
+
+            {/* VISTA: CURSO CON GOOGLE FORM */}
+            {vistaActual === "curso" && (
+              <section className="py-20 px-4 max-w-4xl mx-auto text-center w-full flex-grow flex flex-col">
+                <h2 className="text-4xl font-bold mb-6 text-yellow-500"></h2>
+                <p className="text-gray-300 text-lg mb-8 max-w-2xl mx-auto">
+                  
+                </p>
+                <div className="w-full bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800 p-2">
+                  <iframe 
+                    src="https://docs.google.com/forms/d/e/1FAIpQLSdM_LerAvp8_YcIXyLxVDjlwUK1hu5ucyZBNR94rncKFBsScA/viewform?usp=publish-editor" 
+                    className="w-full min-h-[600px] md:min-h-[800px] rounded-lg bg-white"
+                    frameBorder="0" 
+                    marginHeight={0} 
+                    marginWidth={0}
+                  >
+                    Cargando formulario...
+                  </iframe>
                 </div>
               </section>
             )}
