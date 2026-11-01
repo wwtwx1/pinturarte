@@ -7,6 +7,8 @@ const formatearPrecio = (precio: number) => {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(precio);
 };
 
+const SUPER_ADMIN = "chikyrxn@hotmail.com"; 
+
 const seccionesNosotros = [
   {
     id: "quienes",
@@ -41,7 +43,6 @@ export default function Home() {
   const [vistaAuth, setVistaAuth] = useState("login"); 
   const [mostrarBotonArriba, setMostrarBotonArriba] = useState(false);
   
-  // Estados para Login
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nombreCompleto, setNombreCompleto] = useState("");
@@ -49,20 +50,17 @@ export default function Home() {
   const [errorAuth, setErrorAuth] = useState("");
   const [mensajeExito, setMensajeExito] = useState("");
 
-  // Estados para el Formulario de Contacto
   const [contactoData, setContactoData] = useState({ nombre: "", email: "", motivo: "Compra de una figura", mensaje: "" });
   const [enviandoMensaje, setEnviandoMensaje] = useState(false);
   const [mensajeEnviado, setMensajeEnviado] = useState(false);
 
-  // Estados para el panel de administrador
-  const [adminTab, setAdminTab] = useState("productos"); // 'productos', 'soporte', 'usuarios'
+  const [adminTab, setAdminTab] = useState("productos");
   const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: "", categoria: "Anime", posicion: 1 });
   const [imagenFile, setImagenFile] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [productoEditando, setProductoEditando] = useState<any>(null);
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
   
-  // Estado para agregar nuevos admins
   const [nuevoAdminEmail, setNuevoAdminEmail] = useState("");
 
   const cargarProductos = async () => {
@@ -99,7 +97,9 @@ export default function Home() {
     return () => authListener.subscription.unsubscribe();
   }, []);
 
-  const esAdmin = adminsList.some(a => a.email === usuario?.email);
+  // LÓGICA CORREGIDA: Compara en minúsculas y asegura que el SUPER_ADMIN siempre entre
+  const esAdmin = usuario?.email?.toLowerCase() === SUPER_ADMIN.toLowerCase() || 
+                  adminsList.some(a => a.email?.toLowerCase() === usuario?.email?.toLowerCase());
 
   useEffect(() => {
     if (esAdmin) {
@@ -179,8 +179,8 @@ export default function Home() {
   };
 
   const eliminarAdmin = async (emailToDelete: string) => {
-    if (emailToDelete === usuario?.email) {
-      alert("No puedes eliminarte a ti mismo como administrador.");
+    if (emailToDelete.toLowerCase() === SUPER_ADMIN.toLowerCase()) {
+      alert("No puedes eliminar al Súper Administrador principal.");
       return;
     }
     if (confirm(`¿Estás seguro de quitarle el acceso de administrador a ${emailToDelete}?`)) {
@@ -568,22 +568,14 @@ export default function Home() {
                 
                 <div className="flex flex-col md:flex-row gap-8">
                   
-                  {/* SIDEBAR DE ADMIN */}
                   <div className="w-full md:w-64 flex flex-col gap-2">
-                    <button 
-                      onClick={() => setAdminTab("productos")} 
-                      className={`p-4 text-left rounded-lg font-bold transition flex items-center gap-3 ${adminTab === 'productos' ? 'bg-yellow-600 text-black' : 'bg-zinc-900 text-gray-300 hover:bg-zinc-800'}`}
-                    >
+                    <button onClick={() => setAdminTab("productos")} className={`p-4 text-left rounded-lg font-bold transition flex items-center gap-3 ${adminTab === 'productos' ? 'bg-yellow-600 text-black' : 'bg-zinc-900 text-gray-300 hover:bg-zinc-800'}`}>
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
                       Productos
                     </button>
                     
-                    <button 
-                      onClick={() => setAdminTab("soporte")} 
-                      className={`p-4 text-left rounded-lg font-bold transition flex items-center justify-between ${adminTab === 'soporte' ? 'bg-yellow-600 text-black' : 'bg-zinc-900 text-gray-300 hover:bg-zinc-800'}`}
-                    >
+                    <button onClick={() => setAdminTab("soporte")} className={`p-4 text-left rounded-lg font-bold transition flex items-center justify-between ${adminTab === 'soporte' ? 'bg-yellow-600 text-black' : 'bg-zinc-900 text-gray-300 hover:bg-zinc-800'}`}>
                       <div className="flex items-center gap-3">
-                        {/* ICONO DE CAMPANITA */}
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
                         </svg>
@@ -596,19 +588,14 @@ export default function Home() {
                       )}
                     </button>
                     
-                    <button 
-                      onClick={() => setAdminTab("usuarios")} 
-                      className={`p-4 text-left rounded-lg font-bold transition flex items-center gap-3 ${adminTab === 'usuarios' ? 'bg-yellow-600 text-black' : 'bg-zinc-900 text-gray-300 hover:bg-zinc-800'}`}
-                    >
+                    <button onClick={() => setAdminTab("usuarios")} className={`p-4 text-left rounded-lg font-bold transition flex items-center gap-3 ${adminTab === 'usuarios' ? 'bg-yellow-600 text-black' : 'bg-zinc-900 text-gray-300 hover:bg-zinc-800'}`}>
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
                       Usuarios
                     </button>
                   </div>
 
-                  {/* CONTENIDO DEL ADMIN */}
                   <div className="flex-1 bg-zinc-900 border border-zinc-800 p-6 rounded-xl shadow-lg min-h-[60vh]">
                     
-                    {/* TAB: PRODUCTOS */}
                     {adminTab === "productos" && (
                       <div>
                         <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2">Gestión de Productos</h3>
@@ -667,7 +654,6 @@ export default function Home() {
                       </div>
                     )}
 
-                    {/* TAB: SOPORTE */}
                     {adminTab === "soporte" && (
                       <div>
                         <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2 flex items-center gap-2">
@@ -704,7 +690,6 @@ export default function Home() {
                       </div>
                     )}
 
-                    {/* TAB: USUARIOS */}
                     {adminTab === "usuarios" && (
                       <div>
                         <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2">Administrar Usuarios (Rangos)</h3>
