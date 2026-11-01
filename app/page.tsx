@@ -7,7 +7,7 @@ const formatearPrecio = (precio: number) => {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(precio);
 };
 
-const ADMIN_EMAIL = "ADD ADMIN MAIL"; 
+const ADMIN_EMAIL = "chikyrxn@hotmail.com"; 
 
 const seccionesNosotros = [
   {
