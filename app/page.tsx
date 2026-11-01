@@ -7,8 +7,6 @@ const formatearPrecio = (precio: number) => {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(precio);
 };
 
-const ADMIN_EMAIL = "chikyrxn@hotmail.com"; 
-
 const seccionesNosotros = [
   {
     id: "quienes",
@@ -30,6 +28,7 @@ const seccionesNosotros = [
 export default function Home() {
   const [productos, setProductos] = useState<any[]>([]);
   const [mensajes, setMensajes] = useState<any[]>([]);
+  const [adminsList, setAdminsList] = useState<any[]>([]);
   const [usuario, setUsuario] = useState<any>(null);
   
   const [carrito, setCarrito] = useState<any[]>([]);
@@ -56,11 +55,15 @@ export default function Home() {
   const [mensajeEnviado, setMensajeEnviado] = useState(false);
 
   // Estados para el panel de administrador
+  const [adminTab, setAdminTab] = useState("productos"); // 'productos', 'soporte', 'usuarios'
   const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: "", categoria: "Anime", posicion: 1 });
   const [imagenFile, setImagenFile] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [productoEditando, setProductoEditando] = useState<any>(null);
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
+  
+  // Estado para agregar nuevos admins
+  const [nuevoAdminEmail, setNuevoAdminEmail] = useState("");
 
   const cargarProductos = async () => {
     const { data, error } = await supabase.from('productos').select('*').order('posicion', { ascending: true });
@@ -69,14 +72,18 @@ export default function Home() {
   };
 
   const cargarMensajes = async () => {
-    if (usuario?.email === ADMIN_EMAIL) {
-      const { data } = await supabase.from('mensajes_soporte').select('*').order('created_at', { ascending: false });
-      if (data) setMensajes(data);
-    }
+    const { data } = await supabase.from('mensajes_soporte').select('*').order('created_at', { ascending: false });
+    if (data) setMensajes(data);
+  };
+
+  const cargarAdmins = async () => {
+    const { data } = await supabase.from('admins').select('*');
+    if (data) setAdminsList(data);
   };
 
   useEffect(() => {
     cargarProductos();
+    cargarAdmins();
     
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -92,11 +99,13 @@ export default function Home() {
     return () => authListener.subscription.unsubscribe();
   }, []);
 
+  const esAdmin = adminsList.some(a => a.email === usuario?.email);
+
   useEffect(() => {
-    if (usuario?.email === ADMIN_EMAIL) {
+    if (esAdmin) {
       cargarMensajes();
     }
-  }, [usuario, vistaActual]); // Recarga al cambiar de vista o loguearse
+  }, [usuario, vistaActual, esAdmin]);
 
   useEffect(() => {
     const manejarScroll = () => {
@@ -157,12 +166,36 @@ export default function Home() {
     cargarMensajes();
   };
 
+  const agregarAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nuevoAdminEmail) return;
+    const { error } = await supabase.from('admins').insert([{ email: nuevoAdminEmail.toLowerCase().trim() }]);
+    if (error) alert("Error: " + error.message);
+    else {
+      setNuevoAdminEmail("");
+      cargarAdmins();
+      alert("Administrador agregado correctamente.");
+    }
+  };
+
+  const eliminarAdmin = async (emailToDelete: string) => {
+    if (emailToDelete === usuario?.email) {
+      alert("No puedes eliminarte a ti mismo como administrador.");
+      return;
+    }
+    if (confirm(`¿Estás seguro de quitarle el acceso de administrador a ${emailToDelete}?`)) {
+      const { error } = await supabase.from('admins').delete().eq('email', emailToDelete);
+      if (error) alert("Error: " + error.message);
+      else cargarAdmins();
+    }
+  };
+
   const subirImagen = async (file: File) => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
     const { error: uploadError } = await supabase.storage.from('productos').upload(fileName, file);
     if (uploadError) throw uploadError;
-    const { data } = supabase.storage.from('productos').getPublicUrl(fileName);
+    const { data } = await supabase.storage.from('productos').getPublicUrl(fileName);
     return data.publicUrl;
   };
 
@@ -249,7 +282,6 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const esAdmin = usuario?.email === ADMIN_EMAIL;
   const nombreMostrar = usuario?.user_metadata?.nombre_completo?.split(' ')[0] || usuario?.email?.split('@')[0] || 'Cliente';
   const mensajesNoLeidos = mensajes.filter(m => !m.leido).length;
 
@@ -269,7 +301,6 @@ export default function Home() {
         <div className="flex justify-between items-center w-full">
           <img src="/img/logo.png" alt="Pinturarte Studio" className="h-12 md:h-20 w-auto object-contain cursor-pointer hover:scale-105 transition" onClick={() => cambiarVista("inicio")} />
           
-          {/* BOTONES DE ESCRITORIO */}
           <div className="hidden md:flex gap-3 md:gap-5 items-center text-sm md:text-base pr-2">
             <button onClick={() => cambiarVista("inicio")} className={`${vistaActual === 'inicio' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition`}>Inicio</button>
             <button onClick={() => cambiarVista("catalogo")} className={`${vistaActual === 'catalogo' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition`}>Catálogo</button>
@@ -281,9 +312,7 @@ export default function Home() {
               <button onClick={() => cambiarVista("admin")} className={`relative ${vistaActual === 'admin' ? 'text-red-500 font-bold' : 'hover:text-red-500 text-red-400'} transition border border-red-500/30 px-2 rounded flex items-center gap-1`}>
                 Admin
                 {mensajesNoLeidos > 0 && (
-                  <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">
-                    {mensajesNoLeidos}
-                  </span>
+                  <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">{mensajesNoLeidos}</span>
                 )}
               </button>
             )}
@@ -300,21 +329,17 @@ export default function Home() {
             <button onClick={() => { setMostrarCarrito(!mostrarCarrito); setMostrarLogin(false); }} className="bg-yellow-600 text-black px-4 py-2 rounded font-bold hover:bg-yellow-500 transition">Carrito ({carrito.length})</button>
           </div>
 
-          {/* BOTONES MÓVILES */}
           <div className="flex md:hidden items-center gap-2">
             <button onClick={() => { setMostrarCarrito(!mostrarCarrito); setMostrarLogin(false); }} className="bg-yellow-600 text-black px-3 py-1 text-xs rounded font-bold">Carrito ({carrito.length})</button>
             <button onClick={() => setMenuAbierto(!menuAbierto)} className="text-white p-2 relative">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7">
                 {menuAbierto ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /> : <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />}
               </svg>
-              {esAdmin && mensajesNoLeidos > 0 && (
-                 <span className="absolute top-1 right-1 bg-red-500 w-3 h-3 rounded-full border-2 border-black"></span>
-              )}
+              {esAdmin && mensajesNoLeidos > 0 && <span className="absolute top-1 right-1 bg-red-500 w-3 h-3 rounded-full border-2 border-black animate-pulse"></span>}
             </button>
           </div>
         </div>
 
-        {/* MENÚ DESPLEGABLE MÓVIL */}
         <AnimatePresence>
           {menuAbierto && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="md:hidden mt-2 bg-zinc-900 rounded-lg overflow-hidden flex flex-col border border-zinc-800">
@@ -327,7 +352,7 @@ export default function Home() {
               {esAdmin && (
                 <button onClick={() => cambiarVista("admin")} className="p-3 text-left border-b border-zinc-800 text-red-400 font-bold hover:bg-zinc-800 flex justify-between items-center">
                   Panel Admin
-                  {mensajesNoLeidos > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{mensajesNoLeidos}</span>}
+                  {mensajesNoLeidos > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full animate-pulse">{mensajesNoLeidos}</span>}
                 </button>
               )}
               
@@ -344,29 +369,19 @@ export default function Home() {
         </AnimatePresence>
       </nav>
 
-      {/* MODALES (Login, Editar Producto, Carrito) */}
+      {/* MODALES */}
       {mostrarLogin && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-full max-w-sm">
-            <h3 className="text-xl font-bold mb-4 text-yellow-500">
-              {vistaAuth === "login" ? "Iniciar Sesión" : vistaAuth === "registro" ? "Crear Cuenta" : "Recuperar Contraseña"}
-            </h3>
+            <h3 className="text-xl font-bold mb-4 text-yellow-500">{vistaAuth === "login" ? "Iniciar Sesión" : vistaAuth === "registro" ? "Crear Cuenta" : "Recuperar Contraseña"}</h3>
             {errorAuth && <div className="bg-red-500/20 text-red-400 p-2 rounded mb-3 text-xs">{errorAuth}</div>}
             {mensajeExito && <div className="bg-green-500/20 text-green-400 p-2 rounded mb-3 text-xs">{mensajeExito}</div>}
-
             <form onSubmit={manejarAuth} className="flex flex-col gap-3 mb-4">
-              {vistaAuth === "registro" && (
-                <input type="text" placeholder="Nombre completo" value={nombreCompleto} onChange={(e) => setNombreCompleto(e.target.value)} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" />
-              )}
+              {vistaAuth === "registro" && <input type="text" placeholder="Nombre completo" value={nombreCompleto} onChange={(e) => setNombreCompleto(e.target.value)} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" />}
               <input type="email" placeholder="Correo electrónico" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" />
-              {vistaAuth !== "recuperar" && (
-                <input type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" />
-              )}
-              <button type="submit" disabled={cargando} className="w-full bg-yellow-600 text-black py-2 rounded font-bold hover:bg-yellow-500 transition disabled:opacity-50 mt-2">
-                {cargando ? "Procesando..." : vistaAuth === "login" ? "Ingresar" : vistaAuth === "registro" ? "Registrarse" : "Enviar Enlace"}
-              </button>
+              {vistaAuth !== "recuperar" && <input type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" />}
+              <button type="submit" disabled={cargando} className="w-full bg-yellow-600 text-black py-2 rounded font-bold hover:bg-yellow-500 transition disabled:opacity-50 mt-2">{cargando ? "Procesando..." : vistaAuth === "login" ? "Ingresar" : vistaAuth === "registro" ? "Registrarse" : "Enviar Enlace"}</button>
             </form>
-            
             <div className="flex flex-col gap-2 text-xs text-gray-400">
               {vistaAuth === "login" && (
                 <>
@@ -374,9 +389,7 @@ export default function Home() {
                   <button onClick={() => { setVistaAuth("recuperar"); setErrorAuth(""); setMensajeExito(""); }} className="hover:text-white transition underline text-left">Olvidé mi contraseña</button>
                 </>
               )}
-              {vistaAuth !== "login" && (
-                <button onClick={() => { setVistaAuth("login"); setErrorAuth(""); setMensajeExito(""); }} className="hover:text-white transition underline text-left">Volver al inicio de sesión</button>
-              )}
+              {vistaAuth !== "login" && <button onClick={() => { setVistaAuth("login"); setErrorAuth(""); setMensajeExito(""); }} className="hover:text-white transition underline text-left">Volver al inicio de sesión</button>}
               <button onClick={() => setMostrarLogin(false)} className="mt-2 text-center text-gray-500 hover:text-white">Cerrar ventana</button>
             </div>
           </div>
@@ -506,7 +519,6 @@ export default function Home() {
               </section>
             )}
 
-            {/* VISTA: CONTACTO CON SELECTOR Y SUPABASE */}
             {vistaActual === "contacto" && (
               <section className="py-20 px-4 max-w-2xl mx-auto text-center w-full">
                 <h2 className="text-4xl font-bold mb-8 text-yellow-500">Contacto</h2>
@@ -521,30 +533,24 @@ export default function Home() {
                     <form onSubmit={enviarFormularioContacto} className="flex flex-col gap-4 text-left">
                       <div><label className="block text-sm text-gray-400 mb-1">Nombre completo</label><input required type="text" value={contactoData.nombre} onChange={(e) => setContactoData({...contactoData, nombre: e.target.value})} className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" placeholder="Tu nombre" /></div>
                       <div><label className="block text-sm text-gray-400 mb-1">Correo Electrónico</label><input required type="email" value={contactoData.email} onChange={(e) => setContactoData({...contactoData, email: e.target.value})} className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" placeholder="tu@email.com" /></div>
-                      
                       <div>
                         <label className="block text-sm text-gray-400 mb-1">¿Nos contactas para?</label>
                         <select value={contactoData.motivo} onChange={(e) => setContactoData({...contactoData, motivo: e.target.value})} className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500">
                           <option value="Compra de una figura">Compra de una figura</option>
                           <option value="Cotizar clases de taller">Cotizar clases de taller</option>
-                          <option value="Pedido al por mayor (B2B)">Pedido al por mayor (B2B)</option>
+                          <option value="Pedido al por mayor">Pedido al por mayor</option>
                           <option value="Restauración de una pieza">Restauración de una pieza</option>
                           <option value="Otro motivo">Otro motivo</option>
                         </select>
                       </div>
-
                       <div><label className="block text-sm text-gray-400 mb-1">Mensaje</label><textarea required rows={4} value={contactoData.mensaje} onChange={(e) => setContactoData({...contactoData, mensaje: e.target.value})} className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" placeholder="¿En qué te podemos ayudar?"></textarea></div>
-                      
-                      <button type="submit" disabled={enviandoMensaje} className="bg-yellow-600 text-black py-3 rounded font-bold hover:bg-yellow-500 transition mt-2 disabled:opacity-50">
-                        {enviandoMensaje ? "Enviando..." : "Enviar Mensaje"}
-                      </button>
+                      <button type="submit" disabled={enviandoMensaje} className="bg-yellow-600 text-black py-3 rounded font-bold hover:bg-yellow-500 transition mt-2 disabled:opacity-50">{enviandoMensaje ? "Enviando..." : "Enviar Mensaje"}</button>
                     </form>
                   )}
                 </div>
               </section>
             )}
 
-            {/* VISTA: CURSO CON GOOGLE FORM */}
             {vistaActual === "curso" && (
               <section className="py-20 px-4 max-w-4xl mx-auto text-center w-full flex-grow flex flex-col">
                 <h2 className="text-4xl font-bold mb-6 text-yellow-500">Nuestros Cursos y Talleres</h2>
@@ -555,105 +561,196 @@ export default function Home() {
               </section>
             )}
 
-            {/* VISTA: PANEL DE ADMINISTRADOR */}
+            {/* VISTA: PANEL DE ADMINISTRADOR CON SIDEBAR */}
             {vistaActual === "admin" && esAdmin && (
-              <section className="py-12 px-4 max-w-6xl mx-auto w-full">
+              <section className="py-12 px-4 max-w-7xl mx-auto w-full">
                 <h2 className="text-3xl font-bold mb-8 text-red-500">Panel de Administrador</h2>
                 
-                {/* Sección: Productos */}
-                <div className="mb-16">
-                  <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2">Gestión de Productos</h3>
-                  <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl mb-6 shadow-lg">
-                    <h4 className="text-lg font-bold mb-4 text-white">Agregar Nuevo Producto</h4>
-                    <form onSubmit={crearProducto} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <input type="text" placeholder="Nombre del producto" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-                      <input type="number" placeholder="Precio (solo números)" value={nuevoProducto.precio} onChange={(e) => setNuevoProducto({...nuevoProducto, precio: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-                      <input type="text" placeholder="Categoría" value={nuevoProducto.categoria} onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-                      <input type="number" placeholder="Posición (ej: 1)" value={nuevoProducto.posicion} onChange={(e) => setNuevoProducto({...nuevoProducto, posicion: Number(e.target.value)})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-                      <textarea placeholder="Descripción" value={nuevoProducto.descripcion} onChange={(e) => setNuevoProducto({...nuevoProducto, descripcion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white md:col-span-2" rows={2}></textarea>
-                      <div className="md:col-span-2">
-                        <label className="block text-sm text-gray-400 mb-1">Imagen del producto</label>
-                        <input type="file" accept="image/*" onChange={(e) => setImagenFile(e.target.files ? e.target.files[0] : null)} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white w-full" />
+                <div className="flex flex-col md:flex-row gap-8">
+                  
+                  {/* SIDEBAR DE ADMIN */}
+                  <div className="w-full md:w-64 flex flex-col gap-2">
+                    <button 
+                      onClick={() => setAdminTab("productos")} 
+                      className={`p-4 text-left rounded-lg font-bold transition flex items-center gap-3 ${adminTab === 'productos' ? 'bg-yellow-600 text-black' : 'bg-zinc-900 text-gray-300 hover:bg-zinc-800'}`}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
+                      Productos
+                    </button>
+                    
+                    <button 
+                      onClick={() => setAdminTab("soporte")} 
+                      className={`p-4 text-left rounded-lg font-bold transition flex items-center justify-between ${adminTab === 'soporte' ? 'bg-yellow-600 text-black' : 'bg-zinc-900 text-gray-300 hover:bg-zinc-800'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        {/* ICONO DE CAMPANITA */}
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+                        </svg>
+                        Soporte
                       </div>
-                      <button type="submit" disabled={subiendo} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded md:col-span-2 transition">{subiendo ? "Subiendo..." : "Guardar Producto"}</button>
-                    </form>
+                      {mensajesNoLeidos > 0 && (
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold animate-pulse ${adminTab === 'soporte' ? 'bg-black text-yellow-500' : 'bg-red-500 text-white'}`}>
+                          {mensajesNoLeidos}
+                        </span>
+                      )}
+                    </button>
+                    
+                    <button 
+                      onClick={() => setAdminTab("usuarios")} 
+                      className={`p-4 text-left rounded-lg font-bold transition flex items-center gap-3 ${adminTab === 'usuarios' ? 'bg-yellow-600 text-black' : 'bg-zinc-900 text-gray-300 hover:bg-zinc-800'}`}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
+                      Usuarios
+                    </button>
                   </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-black text-yellow-500 border-b border-zinc-800">
-                          <th className="p-3">Pos</th>
-                          <th className="p-3 hidden md:table-cell">Imagen</th>
-                          <th className="p-3">Nombre</th>
-                          <th className="p-3 hidden md:table-cell">Precio</th>
-                          <th className="p-3 text-right">Acciones</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {productos.map((prod) => (
-                          <tr key={prod.id} className="border-b border-zinc-800 hover:bg-zinc-900/50">
-                            <td className="p-3">
-                              <div className="flex items-center gap-1">
-                                <span className="text-gray-400 w-6">{prod.posicion}</span>
-                                <div className="flex flex-col">
-                                  <button onClick={() => moverPosicion(prod, 'subir')} className="text-gray-500 hover:text-white text-xs">▲</button>
-                                  <button onClick={() => moverPosicion(prod, 'bajar')} className="text-gray-500 hover:text-white text-xs">▼</button>
+                  {/* CONTENIDO DEL ADMIN */}
+                  <div className="flex-1 bg-zinc-900 border border-zinc-800 p-6 rounded-xl shadow-lg min-h-[60vh]">
+                    
+                    {/* TAB: PRODUCTOS */}
+                    {adminTab === "productos" && (
+                      <div>
+                        <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2">Gestión de Productos</h3>
+                        
+                        <div className="bg-black/30 p-4 rounded-lg mb-6">
+                          <h4 className="text-lg font-bold mb-4 text-white">Agregar Nuevo Producto</h4>
+                          <form onSubmit={crearProducto} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <input type="text" placeholder="Nombre del producto" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                            <input type="number" placeholder="Precio (solo números)" value={nuevoProducto.precio} onChange={(e) => setNuevoProducto({...nuevoProducto, precio: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                            <input type="text" placeholder="Categoría" value={nuevoProducto.categoria} onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                            <input type="number" placeholder="Posición (ej: 1)" value={nuevoProducto.posicion} onChange={(e) => setNuevoProducto({...nuevoProducto, posicion: Number(e.target.value)})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                            <textarea placeholder="Descripción" value={nuevoProducto.descripcion} onChange={(e) => setNuevoProducto({...nuevoProducto, descripcion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white md:col-span-2" rows={2}></textarea>
+                            <div className="md:col-span-2">
+                              <label className="block text-sm text-gray-400 mb-1">Imagen del producto</label>
+                              <input type="file" accept="image/*" onChange={(e) => setImagenFile(e.target.files ? e.target.files[0] : null)} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white w-full" />
+                            </div>
+                            <button type="submit" disabled={subiendo} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded md:col-span-2 transition">{subiendo ? "Subiendo..." : "Guardar Producto"}</button>
+                          </form>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="bg-black text-yellow-500 border-b border-zinc-800">
+                                <th className="p-3">Pos</th>
+                                <th className="p-3 hidden md:table-cell">Imagen</th>
+                                <th className="p-3">Nombre</th>
+                                <th className="p-3 hidden md:table-cell">Precio</th>
+                                <th className="p-3 text-right">Acciones</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {productos.map((prod) => (
+                                <tr key={prod.id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
+                                  <td className="p-3">
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-gray-400 w-6">{prod.posicion}</span>
+                                      <div className="flex flex-col">
+                                        <button onClick={() => moverPosicion(prod, 'subir')} className="text-gray-500 hover:text-white text-xs">▲</button>
+                                        <button onClick={() => moverPosicion(prod, 'bajar')} className="text-gray-500 hover:text-white text-xs">▼</button>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="p-3 hidden md:table-cell"><img src={prod.imagen} alt={prod.nombre} className="w-12 h-12 object-cover rounded" /></td>
+                                  <td className="p-3">{prod.nombre} <div className="md:hidden text-yellow-500 font-bold text-sm mt-1">{formatearPrecio(prod.precio)}</div></td>
+                                  <td className="p-3 hidden md:table-cell"><span className="text-yellow-500 font-bold">{formatearPrecio(prod.precio)}</span></td>
+                                  <td className="p-3 text-right flex flex-col md:flex-row items-end md:items-center justify-end gap-2">
+                                    <button onClick={() => setProductoEditando(prod)} className="text-blue-400 hover:text-blue-300 text-sm font-bold">Editar</button>
+                                    <button onClick={() => eliminarProducto(prod.id)} className="text-red-500 hover:text-red-400 text-sm font-bold">Eliminar</button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* TAB: SOPORTE */}
+                    {adminTab === "soporte" && (
+                      <div>
+                        <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2 flex items-center gap-2">
+                          Bandeja de Soporte
+                          {mensajesNoLeidos > 0 && <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">{mensajesNoLeidos} nuevos</span>}
+                        </h3>
+                        
+                        {mensajes.length === 0 ? (
+                          <p className="text-gray-400 text-center py-10">No hay mensajes de soporte por ahora.</p>
+                        ) : (
+                          <div className="flex flex-col gap-4">
+                            {mensajes.map((msg) => (
+                              <div key={msg.id} className={`p-5 rounded-xl border ${msg.leido ? 'bg-zinc-900/50 border-zinc-800' : 'bg-zinc-800 border-yellow-600/50 shadow-lg'}`}>
+                                <div className="flex flex-col md:flex-row justify-between md:items-center mb-3 gap-2">
+                                  <div>
+                                    <span className="font-bold text-lg text-white">{msg.nombre}</span>
+                                    <span className="text-gray-400 text-sm ml-2">({msg.email})</span>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-yellow-500 bg-black px-2 py-1 rounded">{msg.motivo}</span>
+                                    <span className="text-xs text-gray-500">{new Date(msg.created_at).toLocaleDateString()}</span>
+                                  </div>
+                                </div>
+                                <p className="text-gray-300 mb-4 whitespace-pre-line text-sm bg-black/30 p-3 rounded">{msg.mensaje}</p>
+                                <div className="flex justify-end">
+                                  <button onClick={() => marcarMensajeLeido(msg.id, msg.leido)} className={`text-sm font-bold px-4 py-2 rounded transition ${msg.leido ? 'text-gray-400 bg-zinc-800 hover:text-white' : 'text-black bg-yellow-600 hover:bg-yellow-500'}`}>
+                                    {msg.leido ? "Marcar como no leído" : "Marcar como leído"}
+                                  </button>
                                 </div>
                               </div>
-                            </td>
-                            <td className="p-3 hidden md:table-cell"><img src={prod.imagen} alt={prod.nombre} className="w-12 h-12 object-cover rounded" /></td>
-                            <td className="p-3">{prod.nombre} <div className="md:hidden text-yellow-500 font-bold text-sm mt-1">{formatearPrecio(prod.precio)}</div></td>
-                            <td className="p-3 hidden md:table-cell"><span className="text-yellow-500 font-bold">{formatearPrecio(prod.precio)}</span></td>
-                            <td className="p-3 text-right flex flex-col md:flex-row items-end md:items-center justify-end gap-2">
-                              <button onClick={() => setProductoEditando(prod)} className="text-blue-400 hover:text-blue-300 text-sm font-bold">Editar</button>
-                              <button onClick={() => eliminarProducto(prod.id)} className="text-red-500 hover:text-red-400 text-sm font-bold">Eliminar</button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* TAB: USUARIOS */}
+                    {adminTab === "usuarios" && (
+                      <div>
+                        <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2">Administrar Usuarios (Rangos)</h3>
+                        
+                        <div className="bg-black/30 p-4 rounded-lg mb-8">
+                          <h4 className="text-lg font-bold mb-4 text-white">Dar rango de Administrador</h4>
+                          <p className="text-sm text-gray-400 mb-4">Ingresa el correo exacto del usuario registrado para darle acceso al panel de administrador.</p>
+                          <form onSubmit={agregarAdmin} className="flex flex-col md:flex-row gap-3">
+                            <input 
+                              type="email" 
+                              placeholder="correo@ejemplo.com" 
+                              value={nuevoAdminEmail} 
+                              onChange={(e) => setNuevoAdminEmail(e.target.value)} 
+                              required 
+                              className="p-3 bg-zinc-800 border border-zinc-700 rounded text-white flex-1" 
+                            />
+                            <button type="submit" className="bg-yellow-600 text-black font-bold py-3 px-6 rounded hover:bg-yellow-500 transition">Agregar Admin</button>
+                          </form>
+                        </div>
+
+                        <h4 className="text-lg font-bold mb-4 text-white">Lista de Administradores</h4>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="bg-black text-yellow-500 border-b border-zinc-800">
+                                <th className="p-3">Correo Electrónico</th>
+                                <th className="p-3 text-right">Acciones</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {adminsList.map((admin, index) => (
+                                <tr key={index} className="border-b border-zinc-800 hover:bg-zinc-800/50">
+                                  <td className="p-3 font-medium">{admin.email}</td>
+                                  <td className="p-3 text-right">
+                                    <button onClick={() => eliminarAdmin(admin.email)} className="text-red-500 hover:text-red-400 text-sm font-bold">Quitar Rango</button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
                   </div>
                 </div>
-
-                {/* Sección: Soporte / Mensajes */}
-                <div>
-                  <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2 flex items-center gap-2">
-                    Bandeja de Soporte
-                    {mensajesNoLeidos > 0 && <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">{mensajesNoLeidos} nuevos</span>}
-                  </h3>
-                  
-                  {mensajes.length === 0 ? (
-                    <p className="text-gray-400 bg-zinc-900 p-6 rounded-xl text-center">No hay mensajes de soporte por ahora.</p>
-                  ) : (
-                    <div className="flex flex-col gap-4">
-                      {mensajes.map((msg) => (
-                        <div key={msg.id} className={`p-5 rounded-xl border ${msg.leido ? 'bg-zinc-900/50 border-zinc-800' : 'bg-zinc-800 border-yellow-600/50 shadow-lg'}`}>
-                          <div className="flex flex-col md:flex-row justify-between md:items-center mb-3 gap-2">
-                            <div>
-                              <span className="font-bold text-lg text-white">{msg.nombre}</span>
-                              <span className="text-gray-400 text-sm ml-2">({msg.email})</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs font-bold uppercase tracking-wider text-yellow-500 bg-black px-2 py-1 rounded">{msg.motivo}</span>
-                              <span className="text-xs text-gray-500">{new Date(msg.created_at).toLocaleDateString()}</span>
-                            </div>
-                          </div>
-                          <p className="text-gray-300 mb-4 whitespace-pre-line text-sm bg-black/30 p-3 rounded">{msg.mensaje}</p>
-                          <div className="flex justify-end">
-                            <button 
-                              onClick={() => marcarMensajeLeido(msg.id, msg.leido)} 
-                              className={`text-sm font-bold px-4 py-2 rounded transition ${msg.leido ? 'text-gray-400 bg-zinc-800 hover:text-white' : 'text-black bg-yellow-600 hover:bg-yellow-500'}`}
-                            >
-                              {msg.leido ? "Marcar como no leído" : "Marcar como leído"}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
               </section>
             )}
           </motion.div>
