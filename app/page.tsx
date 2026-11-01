@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "./supabase";
 
 const formatearPrecio = (precio: number) => {
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(precio);
+  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(precio);
 };
 
 const ADMIN_EMAIL = "chikyrxn@hotmail.com"; 
@@ -29,6 +29,7 @@ const seccionesNosotros = [
 
 export default function Home() {
   const [productos, setProductos] = useState<any[]>([]);
+  const [mensajes, setMensajes] = useState<any[]>([]);
   const [usuario, setUsuario] = useState<any>(null);
   
   const [carrito, setCarrito] = useState<any[]>([]);
@@ -41,6 +42,7 @@ export default function Home() {
   const [vistaAuth, setVistaAuth] = useState("login"); 
   const [mostrarBotonArriba, setMostrarBotonArriba] = useState(false);
   
+  // Estados para Login
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nombreCompleto, setNombreCompleto] = useState("");
@@ -48,19 +50,29 @@ export default function Home() {
   const [errorAuth, setErrorAuth] = useState("");
   const [mensajeExito, setMensajeExito] = useState("");
 
+  // Estados para el Formulario de Contacto
+  const [contactoData, setContactoData] = useState({ nombre: "", email: "", motivo: "Compra de una figura", mensaje: "" });
+  const [enviandoMensaje, setEnviandoMensaje] = useState(false);
   const [mensajeEnviado, setMensajeEnviado] = useState(false);
 
+  // Estados para el panel de administrador
   const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: "", categoria: "Anime", posicion: 1 });
   const [imagenFile, setImagenFile] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [productoEditando, setProductoEditando] = useState<any>(null);
-
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
 
   const cargarProductos = async () => {
     const { data, error } = await supabase.from('productos').select('*').order('posicion', { ascending: true });
     if (data) setProductos(data);
     if (error) console.error("Error cargando productos:", error);
+  };
+
+  const cargarMensajes = async () => {
+    if (usuario?.email === ADMIN_EMAIL) {
+      const { data } = await supabase.from('mensajes_soporte').select('*').order('created_at', { ascending: false });
+      if (data) setMensajes(data);
+    }
   };
 
   useEffect(() => {
@@ -79,6 +91,12 @@ export default function Home() {
 
     return () => authListener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (usuario?.email === ADMIN_EMAIL) {
+      cargarMensajes();
+    }
+  }, [usuario, vistaActual]); // Recarga al cambiar de vista o loguearse
 
   useEffect(() => {
     const manejarScroll = () => {
@@ -120,15 +138,31 @@ export default function Home() {
     setMenuAbierto(false);
   };
 
+  const enviarFormularioContacto = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEnviandoMensaje(true);
+    const { error } = await supabase.from('mensajes_soporte').insert([contactoData]);
+    
+    if (!error) {
+      setMensajeEnviado(true);
+      setContactoData({ nombre: "", email: "", motivo: "Compra de una figura", mensaje: "" });
+    } else {
+      alert("Error al enviar el mensaje. Intenta de nuevo.");
+    }
+    setEnviandoMensaje(false);
+  };
+
+  const marcarMensajeLeido = async (id: number, estadoActual: boolean) => {
+    await supabase.from('mensajes_soporte').update({ leido: !estadoActual }).eq('id', id);
+    cargarMensajes();
+  };
+
   const subirImagen = async (file: File) => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-    const filePath = `${fileName}`;
-
-    const { error: uploadError } = await supabase.storage.from('productos').upload(filePath, file);
+    const { error: uploadError } = await supabase.storage.from('productos').upload(fileName, file);
     if (uploadError) throw uploadError;
-
-    const { data } = supabase.storage.from('productos').getPublicUrl(filePath);
+    const { data } = supabase.storage.from('productos').getPublicUrl(fileName);
     return data.publicUrl;
   };
 
@@ -138,10 +172,7 @@ export default function Home() {
     let urlImagen = "/img/goku.jpg"; 
 
     try {
-      if (imagenFile) {
-        urlImagen = await subirImagen(imagenFile);
-      }
-
+      if (imagenFile) urlImagen = await subirImagen(imagenFile);
       const { error } = await supabase.from('productos').insert([{
         nombre: nuevoProducto.nombre,
         descripcion: nuevoProducto.descripcion,
@@ -150,9 +181,7 @@ export default function Home() {
         posicion: Number(nuevoProducto.posicion),
         imagen: urlImagen
       }]);
-
       if (error) throw error;
-
       alert("Producto creado exitosamente");
       setNuevoProducto({ nombre: "", descripcion: "", precio: "", categoria: "Anime", posicion: 1 });
       setImagenFile(null);
@@ -171,10 +200,7 @@ export default function Home() {
 
     try {
       let urlImagen = productoEditando.imagen;
-      
-      if (imagenFile) {
-        urlImagen = await subirImagen(imagenFile);
-      }
+      if (imagenFile) urlImagen = await subirImagen(imagenFile);
 
       const { error } = await supabase.from('productos').update({
         nombre: productoEditando.nombre,
@@ -186,7 +212,6 @@ export default function Home() {
       }).eq('id', productoEditando.id);
 
       if (error) throw error;
-
       alert("Producto actualizado");
       setProductoEditando(null);
       setImagenFile(null);
@@ -213,13 +238,8 @@ export default function Home() {
   };
 
   const volverArriba = () => window.scrollTo({ top: 0, behavior: "smooth" });
-  const agregarAlCarrito = (producto: any) => {
-    setCarrito([...carrito, producto]);
-    setMostrarCarrito(true);
-  };
-  const eliminarDelCarrito = (indexAEliminar: number) => {
-    setCarrito(carrito.filter((_, index) => index !== indexAEliminar));
-  };
+  const agregarAlCarrito = (producto: any) => { setCarrito([...carrito, producto]); setMostrarCarrito(true); };
+  const eliminarDelCarrito = (indexAEliminar: number) => setCarrito(carrito.filter((_, index) => index !== indexAEliminar));
   const total = carrito.reduce((sum, item) => sum + Number(item.precio), 0);
   
   const cambiarVista = (vista: string) => {
@@ -231,6 +251,7 @@ export default function Home() {
 
   const esAdmin = usuario?.email === ADMIN_EMAIL;
   const nombreMostrar = usuario?.user_metadata?.nombre_completo?.split(' ')[0] || usuario?.email?.split('@')[0] || 'Cliente';
+  const mensajesNoLeidos = mensajes.filter(m => !m.leido).length;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white font-sans flex flex-col overflow-hidden relative">
@@ -257,7 +278,14 @@ export default function Home() {
             <button onClick={() => cambiarVista("curso")} className={`${vistaActual === 'curso' ? 'text-yellow-500 font-bold' : 'hover:text-yellow-500 text-gray-300'} transition`}>Curso</button>
             
             {esAdmin && (
-              <button onClick={() => cambiarVista("admin")} className={`${vistaActual === 'admin' ? 'text-red-500 font-bold' : 'hover:text-red-500 text-red-400'} transition border border-red-500/30 px-2 rounded`}>Admin</button>
+              <button onClick={() => cambiarVista("admin")} className={`relative ${vistaActual === 'admin' ? 'text-red-500 font-bold' : 'hover:text-red-500 text-red-400'} transition border border-red-500/30 px-2 rounded flex items-center gap-1`}>
+                Admin
+                {mensajesNoLeidos > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse">
+                    {mensajesNoLeidos}
+                  </span>
+                )}
+              </button>
             )}
 
             {usuario ? (
@@ -275,14 +303,13 @@ export default function Home() {
           {/* BOTONES MÓVILES */}
           <div className="flex md:hidden items-center gap-2">
             <button onClick={() => { setMostrarCarrito(!mostrarCarrito); setMostrarLogin(false); }} className="bg-yellow-600 text-black px-3 py-1 text-xs rounded font-bold">Carrito ({carrito.length})</button>
-            <button onClick={() => setMenuAbierto(!menuAbierto)} className="text-white p-2">
+            <button onClick={() => setMenuAbierto(!menuAbierto)} className="text-white p-2 relative">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7">
-                {menuAbierto ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-                )}
+                {menuAbierto ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /> : <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />}
               </svg>
+              {esAdmin && mensajesNoLeidos > 0 && (
+                 <span className="absolute top-1 right-1 bg-red-500 w-3 h-3 rounded-full border-2 border-black"></span>
+              )}
             </button>
           </div>
         </div>
@@ -290,12 +317,7 @@ export default function Home() {
         {/* MENÚ DESPLEGABLE MÓVIL */}
         <AnimatePresence>
           {menuAbierto && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }} 
-              animate={{ opacity: 1, height: "auto" }} 
-              exit={{ opacity: 0, height: 0 }}
-              className="md:hidden mt-2 bg-zinc-900 rounded-lg overflow-hidden flex flex-col border border-zinc-800"
-            >
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="md:hidden mt-2 bg-zinc-900 rounded-lg overflow-hidden flex flex-col border border-zinc-800">
               <button onClick={() => cambiarVista("inicio")} className="p-3 text-left border-b border-zinc-800 hover:bg-zinc-800">Inicio</button>
               <button onClick={() => cambiarVista("catalogo")} className="p-3 text-left border-b border-zinc-800 hover:bg-zinc-800">Catálogo</button>
               <button onClick={() => cambiarVista("nosotros")} className="p-3 text-left border-b border-zinc-800 hover:bg-zinc-800">Nosotros</button>
@@ -303,7 +325,10 @@ export default function Home() {
               <button onClick={() => cambiarVista("curso")} className="p-3 text-left border-b border-zinc-800 hover:bg-zinc-800">Curso</button>
               
               {esAdmin && (
-                <button onClick={() => cambiarVista("admin")} className="p-3 text-left border-b border-zinc-800 text-red-400 font-bold hover:bg-zinc-800">Panel Admin</button>
+                <button onClick={() => cambiarVista("admin")} className="p-3 text-left border-b border-zinc-800 text-red-400 font-bold hover:bg-zinc-800 flex justify-between items-center">
+                  Panel Admin
+                  {mensajesNoLeidos > 0 && <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{mensajesNoLeidos}</span>}
+                </button>
               )}
               
               {usuario ? (
@@ -319,14 +344,13 @@ export default function Home() {
         </AnimatePresence>
       </nav>
 
-      {/* MODAL DE AUTENTICACIÓN */}
+      {/* MODALES (Login, Editar Producto, Carrito) */}
       {mostrarLogin && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-full max-w-sm">
             <h3 className="text-xl font-bold mb-4 text-yellow-500">
               {vistaAuth === "login" ? "Iniciar Sesión" : vistaAuth === "registro" ? "Crear Cuenta" : "Recuperar Contraseña"}
             </h3>
-            
             {errorAuth && <div className="bg-red-500/20 text-red-400 p-2 rounded mb-3 text-xs">{errorAuth}</div>}
             {mensajeExito && <div className="bg-green-500/20 text-green-400 p-2 rounded mb-3 text-xs">{mensajeExito}</div>}
 
@@ -335,11 +359,9 @@ export default function Home() {
                 <input type="text" placeholder="Nombre completo" value={nombreCompleto} onChange={(e) => setNombreCompleto(e.target.value)} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" />
               )}
               <input type="email" placeholder="Correo electrónico" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" />
-              
               {vistaAuth !== "recuperar" && (
                 <input type="password" placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" />
               )}
-              
               <button type="submit" disabled={cargando} className="w-full bg-yellow-600 text-black py-2 rounded font-bold hover:bg-yellow-500 transition disabled:opacity-50 mt-2">
                 {cargando ? "Procesando..." : vistaAuth === "login" ? "Ingresar" : vistaAuth === "registro" ? "Registrarse" : "Enviar Enlace"}
               </button>
@@ -361,7 +383,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL DE EDICIÓN DE PRODUCTO */}
       {productoEditando && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -372,10 +393,8 @@ export default function Home() {
               <input type="text" placeholder="Categoría" value={productoEditando.categoria} onChange={(e) => setProductoEditando({...productoEditando, categoria: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
               <input type="number" placeholder="Posición (ej: 1)" value={productoEditando.posicion} onChange={(e) => setProductoEditando({...productoEditando, posicion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
               <textarea placeholder="Descripción" value={productoEditando.descripcion} onChange={(e) => setProductoEditando({...productoEditando, descripcion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" rows={3}></textarea>
-              
               <div className="text-sm text-gray-400 mt-2">Dejar en blanco para mantener la imagen actual:</div>
               <input type="file" accept="image/*" onChange={(e) => setImagenFile(e.target.files ? e.target.files[0] : null)} className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-
               <div className="flex gap-2 mt-4">
                 <button type="submit" disabled={subiendo} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition">{subiendo ? "Guardando..." : "Guardar Cambios"}</button>
                 <button type="button" onClick={() => { setProductoEditando(null); setImagenFile(null); }} className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white font-bold py-2 rounded transition">Cancelar</button>
@@ -385,7 +404,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL DEL CARRITO */}
       {mostrarCarrito && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-full max-w-sm">
@@ -466,33 +484,19 @@ export default function Home() {
             {vistaActual === "nosotros" && (
               <section className="py-20 px-4 max-w-3xl mx-auto w-full">
                 <h2 className="text-4xl font-bold mb-12 text-center text-yellow-500">Sobre Nosotros</h2>
-                
                 <div className="flex flex-col gap-4">
                   {seccionesNosotros.map((seccion) => (
                     <div key={seccion.id} className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-lg hover:border-yellow-600/30 transition">
-                      <button 
-                        onClick={() => setSeccionAbierta(seccionAbierta === seccion.id ? null : seccion.id)}
-                        className="w-full p-6 text-left flex justify-between items-center bg-zinc-900 hover:bg-zinc-800/50 transition"
-                      >
+                      <button onClick={() => setSeccionAbierta(seccionAbierta === seccion.id ? null : seccion.id)} className="w-full p-6 text-left flex justify-between items-center bg-zinc-900 hover:bg-zinc-800/50 transition">
                         <h3 className="text-2xl font-bold text-yellow-500">{seccion.titulo}</h3>
                         <motion.div animate={{ rotate: seccionAbierta === seccion.id ? 180 : 0 }}>
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6 text-yellow-500">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                          </svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6 text-yellow-500"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
                         </motion.div>
                       </button>
-                      
                       <AnimatePresence>
                         {seccionAbierta === seccion.id && (
-                          <motion.div 
-                            initial={{ height: 0, opacity: 0 }} 
-                            animate={{ height: "auto", opacity: 1 }} 
-                            exit={{ height: 0, opacity: 0 }}
-                            className="overflow-hidden"
-                          >
-                            <div className="p-6 pt-0 text-gray-300 leading-relaxed whitespace-pre-line border-t border-zinc-800/50 mt-2">
-                              {seccion.contenido}
-                            </div>
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                            <div className="p-6 pt-0 text-gray-300 leading-relaxed whitespace-pre-line border-t border-zinc-800/50 mt-2">{seccion.contenido}</div>
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -502,6 +506,7 @@ export default function Home() {
               </section>
             )}
 
+            {/* VISTA: CONTACTO CON SELECTOR Y SUPABASE */}
             {vistaActual === "contacto" && (
               <section className="py-20 px-4 max-w-2xl mx-auto text-center w-full">
                 <h2 className="text-4xl font-bold mb-8 text-yellow-500">Contacto</h2>
@@ -513,11 +518,26 @@ export default function Home() {
                       <button onClick={() => setMensajeEnviado(false)} className="mt-6 text-yellow-500 hover:text-white underline">Enviar otro mensaje</button>
                     </div>
                   ) : (
-                    <form onSubmit={(e) => { e.preventDefault(); setMensajeEnviado(true); }} className="flex flex-col gap-4 text-left">
-                      <div><label className="block text-sm text-gray-400 mb-1">Nombre completo</label><input required type="text" className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" placeholder="Tu nombre" /></div>
-                      <div><label className="block text-sm text-gray-400 mb-1">Correo Electrónico</label><input required type="email" className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" placeholder="tu@email.com" /></div>
-                      <div><label className="block text-sm text-gray-400 mb-1">Mensaje</label><textarea required rows={4} className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" placeholder="¿En qué te podemos ayudar?"></textarea></div>
-                      <button type="submit" className="bg-yellow-600 text-black py-3 rounded font-bold hover:bg-yellow-500 transition mt-2">Enviar Mensaje</button>
+                    <form onSubmit={enviarFormularioContacto} className="flex flex-col gap-4 text-left">
+                      <div><label className="block text-sm text-gray-400 mb-1">Nombre completo</label><input required type="text" value={contactoData.nombre} onChange={(e) => setContactoData({...contactoData, nombre: e.target.value})} className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" placeholder="Tu nombre" /></div>
+                      <div><label className="block text-sm text-gray-400 mb-1">Correo Electrónico</label><input required type="email" value={contactoData.email} onChange={(e) => setContactoData({...contactoData, email: e.target.value})} className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" placeholder="tu@email.com" /></div>
+                      
+                      <div>
+                        <label className="block text-sm text-gray-400 mb-1">¿Nos contactas para?</label>
+                        <select value={contactoData.motivo} onChange={(e) => setContactoData({...contactoData, motivo: e.target.value})} className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500">
+                          <option value="Compra de una figura">Compra de una figura</option>
+                          <option value="Cotizar clases de taller">Cotizar clases de taller</option>
+                          <option value="Pedido al por mayor (B2B)">Pedido al por mayor (B2B)</option>
+                          <option value="Restauración de una pieza">Restauración de una pieza</option>
+                          <option value="Otro motivo">Otro motivo</option>
+                        </select>
+                      </div>
+
+                      <div><label className="block text-sm text-gray-400 mb-1">Mensaje</label><textarea required rows={4} value={contactoData.mensaje} onChange={(e) => setContactoData({...contactoData, mensaje: e.target.value})} className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" placeholder="¿En qué te podemos ayudar?"></textarea></div>
+                      
+                      <button type="submit" disabled={enviandoMensaje} className="bg-yellow-600 text-black py-3 rounded font-bold hover:bg-yellow-500 transition mt-2 disabled:opacity-50">
+                        {enviandoMensaje ? "Enviando..." : "Enviar Mensaje"}
+                      </button>
                     </form>
                   )}
                 </div>
@@ -527,92 +547,113 @@ export default function Home() {
             {/* VISTA: CURSO CON GOOGLE FORM */}
             {vistaActual === "curso" && (
               <section className="py-20 px-4 max-w-4xl mx-auto text-center w-full flex-grow flex flex-col">
-                <h2 className="text-4xl font-bold mb-6 text-yellow-500"></h2>
-                <p className="text-gray-300 text-lg mb-8 max-w-2xl mx-auto">
-                  
-                </p>
+                <h2 className="text-4xl font-bold mb-6 text-yellow-500">Nuestros Cursos y Talleres</h2>
+                <p className="text-gray-300 text-lg mb-8 max-w-2xl mx-auto">¡Aprende el arte de la pintura en yeso! Déjanos tus datos en el siguiente formulario para inscribirte y te contactaremos pronto.</p>
                 <div className="w-full bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800 p-2">
-                  <iframe 
-                    src="https://docs.google.com/forms/d/e/1FAIpQLSdM_LerAvp8_YcIXyLxVDjlwUK1hu5ucyZBNR94rncKFBsScA/viewform?usp=publish-editor" 
-                    className="w-full min-h-[600px] md:min-h-[800px] rounded-lg bg-white"
-                    frameBorder="0" 
-                    marginHeight={0} 
-                    marginWidth={0}
-                  >
-                    Cargando formulario...
-                  </iframe>
+                  <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSdM_LerAvp8_YcIXyLxVDjlwUK1hu5ucyZBNR94rncKFBsScA/viewform?embedded=true" className="w-full min-h-[600px] md:min-h-[800px] rounded-lg bg-white" frameBorder="0" marginHeight={0} marginWidth={0}>Cargando formulario...</iframe>
                 </div>
               </section>
             )}
 
-            {/* VISTA: PANEL DE ADMINISTRADOR ACTUALIZADO */}
+            {/* VISTA: PANEL DE ADMINISTRADOR */}
             {vistaActual === "admin" && esAdmin && (
               <section className="py-12 px-4 max-w-6xl mx-auto w-full">
                 <h2 className="text-3xl font-bold mb-8 text-red-500">Panel de Administrador</h2>
                 
-                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl mb-10 shadow-lg">
-                  <h3 className="text-xl font-bold mb-4 text-white">Agregar Nuevo Producto</h3>
-                  <form onSubmit={crearProducto} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" placeholder="Nombre del producto" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-                    <input type="number" placeholder="Precio (solo números)" value={nuevoProducto.precio} onChange={(e) => setNuevoProducto({...nuevoProducto, precio: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-                    <input type="text" placeholder="Categoría" value={nuevoProducto.categoria} onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-                    <input type="number" placeholder="Posición (ej: 1)" value={nuevoProducto.posicion} onChange={(e) => setNuevoProducto({...nuevoProducto, posicion: Number(e.target.value)})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-                    <textarea placeholder="Descripción" value={nuevoProducto.descripcion} onChange={(e) => setNuevoProducto({...nuevoProducto, descripcion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white md:col-span-2" rows={2}></textarea>
-                    
-                    <div className="md:col-span-2">
-                      <label className="block text-sm text-gray-400 mb-1">Imagen del producto</label>
-                      <input type="file" accept="image/*" onChange={(e) => setImagenFile(e.target.files ? e.target.files[0] : null)} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white w-full" />
-                    </div>
-                    
-                    <button type="submit" disabled={subiendo} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded md:col-span-2 transition">
-                      {subiendo ? "Subiendo..." : "Guardar Producto"}
-                    </button>
-                  </form>
+                {/* Sección: Productos */}
+                <div className="mb-16">
+                  <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2">Gestión de Productos</h3>
+                  <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl mb-6 shadow-lg">
+                    <h4 className="text-lg font-bold mb-4 text-white">Agregar Nuevo Producto</h4>
+                    <form onSubmit={crearProducto} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <input type="text" placeholder="Nombre del producto" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                      <input type="number" placeholder="Precio (solo números)" value={nuevoProducto.precio} onChange={(e) => setNuevoProducto({...nuevoProducto, precio: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                      <input type="text" placeholder="Categoría" value={nuevoProducto.categoria} onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                      <input type="number" placeholder="Posición (ej: 1)" value={nuevoProducto.posicion} onChange={(e) => setNuevoProducto({...nuevoProducto, posicion: Number(e.target.value)})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                      <textarea placeholder="Descripción" value={nuevoProducto.descripcion} onChange={(e) => setNuevoProducto({...nuevoProducto, descripcion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white md:col-span-2" rows={2}></textarea>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm text-gray-400 mb-1">Imagen del producto</label>
+                        <input type="file" accept="image/*" onChange={(e) => setImagenFile(e.target.files ? e.target.files[0] : null)} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white w-full" />
+                      </div>
+                      <button type="submit" disabled={subiendo} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded md:col-span-2 transition">{subiendo ? "Subiendo..." : "Guardar Producto"}</button>
+                    </form>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-black text-yellow-500 border-b border-zinc-800">
+                          <th className="p-3">Pos</th>
+                          <th className="p-3 hidden md:table-cell">Imagen</th>
+                          <th className="p-3">Nombre</th>
+                          <th className="p-3 hidden md:table-cell">Precio</th>
+                          <th className="p-3 text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {productos.map((prod) => (
+                          <tr key={prod.id} className="border-b border-zinc-800 hover:bg-zinc-900/50">
+                            <td className="p-3">
+                              <div className="flex items-center gap-1">
+                                <span className="text-gray-400 w-6">{prod.posicion}</span>
+                                <div className="flex flex-col">
+                                  <button onClick={() => moverPosicion(prod, 'subir')} className="text-gray-500 hover:text-white text-xs">▲</button>
+                                  <button onClick={() => moverPosicion(prod, 'bajar')} className="text-gray-500 hover:text-white text-xs">▼</button>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="p-3 hidden md:table-cell"><img src={prod.imagen} alt={prod.nombre} className="w-12 h-12 object-cover rounded" /></td>
+                            <td className="p-3">{prod.nombre} <div className="md:hidden text-yellow-500 font-bold text-sm mt-1">{formatearPrecio(prod.precio)}</div></td>
+                            <td className="p-3 hidden md:table-cell"><span className="text-yellow-500 font-bold">{formatearPrecio(prod.precio)}</span></td>
+                            <td className="p-3 text-right flex flex-col md:flex-row items-end md:items-center justify-end gap-2">
+                              <button onClick={() => setProductoEditando(prod)} className="text-blue-400 hover:text-blue-300 text-sm font-bold">Editar</button>
+                              <button onClick={() => eliminarProducto(prod.id)} className="text-red-500 hover:text-red-400 text-sm font-bold">Eliminar</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
 
-                <h3 className="text-xl font-bold mb-4 text-white">Productos Existentes</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-black text-yellow-500 border-b border-zinc-800">
-                        <th className="p-3">Pos</th>
-                        <th className="p-3 hidden md:table-cell">Imagen</th>
-                        <th className="p-3">Nombre</th>
-                        <th className="p-3 hidden md:table-cell">Precio</th>
-                        <th className="p-3 text-right">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {productos.map((prod) => (
-                        <tr key={prod.id} className="border-b border-zinc-800 hover:bg-zinc-900/50">
-                          <td className="p-3">
-                            <div className="flex items-center gap-1">
-                              <span className="text-gray-400 w-6">{prod.posicion}</span>
-                              <div className="flex flex-col">
-                                <button onClick={() => moverPosicion(prod, 'subir')} className="text-gray-500 hover:text-white text-xs">▲</button>
-                                <button onClick={() => moverPosicion(prod, 'bajar')} className="text-gray-500 hover:text-white text-xs">▼</button>
-                              </div>
+                {/* Sección: Soporte / Mensajes */}
+                <div>
+                  <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2 flex items-center gap-2">
+                    Bandeja de Soporte
+                    {mensajesNoLeidos > 0 && <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">{mensajesNoLeidos} nuevos</span>}
+                  </h3>
+                  
+                  {mensajes.length === 0 ? (
+                    <p className="text-gray-400 bg-zinc-900 p-6 rounded-xl text-center">No hay mensajes de soporte por ahora.</p>
+                  ) : (
+                    <div className="flex flex-col gap-4">
+                      {mensajes.map((msg) => (
+                        <div key={msg.id} className={`p-5 rounded-xl border ${msg.leido ? 'bg-zinc-900/50 border-zinc-800' : 'bg-zinc-800 border-yellow-600/50 shadow-lg'}`}>
+                          <div className="flex flex-col md:flex-row justify-between md:items-center mb-3 gap-2">
+                            <div>
+                              <span className="font-bold text-lg text-white">{msg.nombre}</span>
+                              <span className="text-gray-400 text-sm ml-2">({msg.email})</span>
                             </div>
-                          </td>
-                          <td className="p-3 hidden md:table-cell">
-                            <img src={prod.imagen} alt={prod.nombre} className="w-12 h-12 object-cover rounded" />
-                          </td>
-                          <td className="p-3">
-                            {prod.nombre}
-                            <div className="md:hidden text-yellow-500 font-bold text-sm mt-1">{formatearPrecio(prod.precio)}</div>
-                          </td>
-                          <td className="p-3 hidden md:table-cell">
-                            <span className="text-yellow-500 font-bold">{formatearPrecio(prod.precio)}</span>
-                          </td>
-                          <td className="p-3 text-right flex flex-col md:flex-row items-end md:items-center justify-end gap-2">
-                            <button onClick={() => setProductoEditando(prod)} className="text-blue-400 hover:text-blue-300 text-sm font-bold">Editar</button>
-                            <button onClick={() => eliminarProducto(prod.id)} className="text-red-500 hover:text-red-400 text-sm font-bold">Eliminar</button>
-                          </td>
-                        </tr>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-bold uppercase tracking-wider text-yellow-500 bg-black px-2 py-1 rounded">{msg.motivo}</span>
+                              <span className="text-xs text-gray-500">{new Date(msg.created_at).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                          <p className="text-gray-300 mb-4 whitespace-pre-line text-sm bg-black/30 p-3 rounded">{msg.mensaje}</p>
+                          <div className="flex justify-end">
+                            <button 
+                              onClick={() => marcarMensajeLeido(msg.id, msg.leido)} 
+                              className={`text-sm font-bold px-4 py-2 rounded transition ${msg.leido ? 'text-gray-400 bg-zinc-800 hover:text-white' : 'text-black bg-yellow-600 hover:bg-yellow-500'}`}
+                            >
+                              {msg.leido ? "Marcar como no leído" : "Marcar como leído"}
+                            </button>
+                          </div>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  )}
                 </div>
+
               </section>
             )}
           </motion.div>
