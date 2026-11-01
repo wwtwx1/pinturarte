@@ -556,7 +556,7 @@ export default function Home() {
                 <h2 className="text-4xl font-bold mb-6 text-yellow-500">Nuestros Cursos y Talleres</h2>
                 <p className="text-gray-300 text-lg mb-8 max-w-2xl mx-auto">¡Aprende el arte de la pintura en yeso! Déjanos tus datos en el siguiente formulario para inscribirte y te contactaremos pronto.</p>
                 <div className="w-full bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800 p-2">
-                  <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSdM_LerAvp8_YcIXyLxVDjlwUK1hu5ucyZBNR94rncKFBsScA/viewform?embedded=true" className="w-full min-h-[600px] md:min-h-[800px] rounded-lg bg-white" frameBorder="0" marginHeight={0} marginWidth={0}>Cargando formulario...</iframe>
+                  <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSdM_LerAvp8_YcIXyLxVDjlwUK1hu5ucyZBNR94rncKFBsScA/viewform?usp=publish-editor" className="w-full min-h-[600px] md:min-h-[800px] rounded-lg bg-white" frameBorder="0" marginHeight={0} marginWidth={0}>Cargando formulario...</iframe>
                 </div>
               </section>
             )}
