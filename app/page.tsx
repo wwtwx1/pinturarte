@@ -62,12 +62,14 @@ export default function Home() {
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
   
   const [nuevoAdminEmail, setNuevoAdminEmail] = useState("");
-  
-  // NUEVO ESTADO: Para ver el detalle de un mensaje
   const [selectedMessage, setSelectedMessage] = useState<any>(null);
+  
+  const [mostrarModalRespuesta, setMostrarModalRespuesta] = useState(false);
+  const [textoRespuesta, setTextoRespuesta] = useState("");
+  const [enviandoCorreo, setEnviandoCorreo] = useState(false);
 
   const cargarProductos = async () => {
-    const { data, error } = await supabase.from('productos').select('*').order('posicion', { ascending: true });
+    const { data } = await supabase.from('productos').select('*').order('posicion', { ascending: true });
     if (data) setProductos(data);
   };
 
@@ -107,6 +109,33 @@ export default function Home() {
       cargarMensajes();
     }
   }, [usuario, vistaActual, esAdmin]);
+
+  // 🔥 LÓGICA DE TIEMPO REAL (REALTIME) 🔥
+  useEffect(() => {
+    if (!esAdmin) return;
+
+    // Escuchamos cualquier cambio en la tabla mensajes_soporte
+    const channel = supabase
+      .channel('realtime-soporte')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'mensajes_soporte' },
+        (payload) => {
+          // Si borran el mensaje que estamos viendo en el detalle, volvemos a la lista
+          if (payload.eventType === 'DELETE' && selectedMessage && payload.old.id === selectedMessage.id) {
+            setSelectedMessage(null);
+          }
+          // Recargamos la lista de mensajes en tiempo real
+          cargarMensajes();
+        }
+      )
+      .subscribe();
+
+    // Limpiamos la conexión cuando salimos del panel
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [esAdmin, selectedMessage]);
 
   useEffect(() => {
     const manejarScroll = () => {
@@ -165,8 +194,7 @@ export default function Home() {
 
   const marcarMensajeLeido = async (id: number, estadoActual: boolean) => {
     await supabase.from('mensajes_soporte').update({ leido: !estadoActual }).eq('id', id);
-    cargarMensajes();
-    // Si estamos viendo el detalle, actualizamos la vista
+    // No hace falta llamar a cargarMensajes() manualmente, el Realtime lo hará.
     if (selectedMessage && selectedMessage.id === id) {
       setSelectedMessage({ ...selectedMessage, leido: !estadoActual });
     }
@@ -174,11 +202,49 @@ export default function Home() {
 
   const eliminarMensaje = async (id: number) => {
     if (confirm("¿Estás seguro de eliminar este mensaje de soporte?")) {
-      await supabase.from('mensajes_soporte').delete().eq('id', id);
-      cargarMensajes();
-      if (selectedMessage && selectedMessage.id === id) {
-        setSelectedMessage(null);
+      const { error } = await supabase.from('mensajes_soporte').delete().eq('id', id);
+      if (error) {
+        alert("Error al eliminar: " + error.message);
+      } else {
+        // El Realtime se encarga de actualizar la lista y cerrar el detalle si es necesario
+        if (selectedMessage && selectedMessage.id === id) {
+          setSelectedMessage(null);
+        }
       }
+    }
+  };
+
+  const enviarCorreoRespuesta = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMessage || !textoRespuesta) return;
+    setEnviandoCorreo(true);
+
+    try {
+      const response = await fetch('/api/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: selectedMessage.email,
+          subject: `Respuesta a tu consulta: ${selectedMessage.motivo}`,
+          message: textoRespuesta
+        })
+      });
+
+      if (response.ok) {
+        alert("¡Correo enviado exitosamente!");
+        setMostrarModalRespuesta(false);
+        setTextoRespuesta("");
+        if (!selectedMessage.leido) {
+          marcarMensajeLeido(selectedMessage.id, false);
+        }
+      } else {
+        alert("Hubo un error al enviar el correo. Revisa la consola.");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Error de red al enviar el correo.");
+    } finally {
+      setEnviandoCorreo(false);
     }
   };
 
@@ -295,7 +361,7 @@ export default function Home() {
     setVistaActual(vista);
     setMensajeEnviado(false);
     setMenuAbierto(false);
-    setSelectedMessage(null); // Resetea el mensaje seleccionado al cambiar de vista
+    setSelectedMessage(null); 
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -461,6 +527,23 @@ export default function Home() {
         </div>
       )}
 
+      {mostrarModalRespuesta && selectedMessage && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-full max-w-lg">
+            <h3 className="text-xl font-bold mb-2 text-yellow-500">Responder a {selectedMessage.nombre}</h3>
+            <p className="text-sm text-gray-400 mb-4">Para: {selectedMessage.email}</p>
+            
+            <form onSubmit={enviarCorreoRespuesta} className="flex flex-col gap-4">
+              <textarea required rows={6} value={textoRespuesta} onChange={(e) => setTextoRespuesta(e.target.value)} className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" placeholder="Escribe tu respuesta aquí..."></textarea>
+              <div className="flex gap-2 mt-2">
+                <button type="submit" disabled={enviandoCorreo} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition disabled:opacity-50">{enviandoCorreo ? "Enviando Correo..." : "Enviar Correo"}</button>
+                <button type="button" onClick={() => setMostrarModalRespuesta(false)} className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white font-bold py-2 rounded transition">Cancelar</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* VISTAS */}
       <main className="flex-grow flex flex-col relative">
         <AnimatePresence mode="wait">
@@ -585,7 +668,6 @@ export default function Home() {
                 
                 <div className="flex flex-col md:flex-row gap-8">
                   
-                  {/* SIDEBAR */}
                   <div className="w-full md:w-64 flex flex-col gap-2">
                     <button onClick={() => setAdminTab("productos")} className={`p-4 text-left rounded-lg font-bold transition flex items-center gap-3 ${adminTab === 'productos' ? 'bg-yellow-600 text-black' : 'bg-zinc-900 text-gray-300 hover:bg-zinc-800'}`}>
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
@@ -612,10 +694,8 @@ export default function Home() {
                     </button>
                   </div>
 
-                  {/* CONTENIDO DEL ADMIN */}
                   <div className="flex-1 bg-zinc-900 border border-zinc-800 p-6 rounded-xl shadow-lg min-h-[60vh] overflow-hidden">
                     
-                    {/* TAB: PRODUCTOS */}
                     {adminTab === "productos" && (
                       <div>
                         <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2">Gestión de Productos</h3>
@@ -674,16 +754,11 @@ export default function Home() {
                       </div>
                     )}
 
-                    {/* TAB: SOPORTE CON VISTA DETALLE */}
                     {adminTab === "soporte" && (
                       <div>
                         {selectedMessage ? (
-                          // VISTA DE DETALLE DEL MENSAJE
                           <div>
-                            <button 
-                              onClick={() => setSelectedMessage(null)} 
-                              className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition font-bold"
-                            >
+                            <button onClick={() => setSelectedMessage(null)} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition font-bold">
                               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
                               Volver a la lista
                             </button>
@@ -708,30 +783,20 @@ export default function Home() {
                               </div>
 
                               <div className="flex flex-col md:flex-row justify-end gap-3">
-                                <button 
-                                  onClick={() => eliminarMensaje(selectedMessage.id)} 
-                                  className="px-4 py-2 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white rounded font-bold transition text-sm"
-                                >
+                                <button onClick={() => eliminarMensaje(selectedMessage.id)} className="px-4 py-2 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white rounded font-bold transition text-sm">
                                   Eliminar Mensaje
                                 </button>
-                                <button 
-                                  onClick={() => marcarMensajeLeido(selectedMessage.id, selectedMessage.leido)} 
-                                  className={`px-4 py-2 rounded font-bold transition text-sm ${selectedMessage.leido ? 'bg-zinc-700 text-gray-300 hover:bg-zinc-600' : 'bg-yellow-600 text-black hover:bg-yellow-500'}`}
-                                >
+                                <button onClick={() => marcarMensajeLeido(selectedMessage.id, selectedMessage.leido)} className={`px-4 py-2 rounded font-bold transition text-sm ${selectedMessage.leido ? 'bg-zinc-700 text-gray-300 hover:bg-zinc-600' : 'bg-yellow-600 text-black hover:bg-yellow-500'}`}>
                                   {selectedMessage.leido ? "Marcar como no leído" : "Marcar como leído"}
                                 </button>
-                                <a 
-                                  href={`mailto:${selectedMessage.email}?subject=Respuesta a tu consulta: ${selectedMessage.motivo}`}
-                                  className="px-6 py-2 bg-green-600 text-white hover:bg-green-500 rounded font-bold transition text-sm flex items-center justify-center gap-2"
-                                >
+                                <button onClick={() => setMostrarModalRespuesta(true)} className="px-6 py-2 bg-green-600 text-white hover:bg-green-500 rounded font-bold transition text-sm flex items-center justify-center gap-2">
                                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
                                   Responder por Correo
-                                </a>
+                                </button>
                               </div>
                             </div>
                           </div>
                         ) : (
-                          // VISTA DE LISTA
                           <div>
                             <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2 flex items-center gap-2">
                               Bandeja de Soporte
@@ -743,11 +808,7 @@ export default function Home() {
                             ) : (
                               <div className="flex flex-col gap-3">
                                 {mensajes.map((msg) => (
-                                  <div 
-                                    key={msg.id} 
-                                    onClick={() => setSelectedMessage(msg)}
-                                    className={`p-4 rounded-xl border cursor-pointer transition hover:scale-[1.01] ${msg.leido ? 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-800 border-yellow-600/50 shadow-lg hover:border-yellow-500'}`}
-                                  >
+                                  <div key={msg.id} onClick={() => setSelectedMessage(msg)} className={`p-4 rounded-xl border cursor-pointer transition hover:scale-[1.01] ${msg.leido ? 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-800 border-yellow-600/50 shadow-lg hover:border-yellow-500'}`}>
                                     <div className="flex flex-col md:flex-row justify-between md:items-center mb-2 gap-2">
                                       <div className="flex items-center gap-3">
                                         <span className="font-bold text-white">{msg.nombre}</span>
@@ -756,17 +817,13 @@ export default function Home() {
                                       <span className="text-xs text-gray-400">{new Date(msg.created_at).toLocaleDateString()}</span>
                                     </div>
                                     
-                                    {/* Texto resumido con break-words para evitar el bug de desbordamiento */}
                                     <p className="text-gray-400 text-sm line-clamp-2 break-words mb-3">
                                       {msg.mensaje}
                                     </p>
 
                                     <div className="flex justify-between items-center">
                                       <span className="text-xs text-blue-400 hover:text-blue-300 font-bold">Ver detalle completo &rarr;</span>
-                                      <button 
-                                        onClick={(e) => { e.stopPropagation(); eliminarMensaje(msg.id); }} 
-                                        className="text-red-500 hover:text-red-400 text-xs font-bold px-2 py-1 bg-black/30 rounded"
-                                      >
+                                      <button onClick={(e) => { e.stopPropagation(); eliminarMensaje(msg.id); }} className="text-red-500 hover:text-red-400 text-xs font-bold px-2 py-1 bg-black/30 rounded">
                                         Eliminar
                                       </button>
                                     </div>
@@ -779,7 +836,6 @@ export default function Home() {
                       </div>
                     )}
 
-                    {/* TAB: USUARIOS */}
                     {adminTab === "usuarios" && (
                       <div>
                         <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2">Administrar Usuarios (Rangos)</h3>
@@ -788,14 +844,7 @@ export default function Home() {
                           <h4 className="text-lg font-bold mb-4 text-white">Dar rango de Administrador</h4>
                           <p className="text-sm text-gray-400 mb-4">Ingresa el correo exacto del usuario registrado para darle acceso al panel de administrador.</p>
                           <form onSubmit={agregarAdmin} className="flex flex-col md:flex-row gap-3">
-                            <input 
-                              type="email" 
-                              placeholder="correo@ejemplo.com" 
-                              value={nuevoAdminEmail} 
-                              onChange={(e) => setNuevoAdminEmail(e.target.value)} 
-                              required 
-                              className="p-3 bg-zinc-800 border border-zinc-700 rounded text-white flex-1" 
-                            />
+                            <input type="email" placeholder="correo@ejemplo.com" value={nuevoAdminEmail} onChange={(e) => setNuevoAdminEmail(e.target.value)} required className="p-3 bg-zinc-800 border border-zinc-700 rounded text-white flex-1" />
                             <button type="submit" className="bg-yellow-600 text-black font-bold py-3 px-6 rounded hover:bg-yellow-500 transition">Agregar Admin</button>
                           </form>
                         </div>
