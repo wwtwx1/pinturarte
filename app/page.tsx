@@ -55,7 +55,9 @@ export default function Home() {
   const [mensajeEnviado, setMensajeEnviado] = useState(false);
 
   const [adminTab, setAdminTab] = useState("productos");
-  const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: "", categoria: "Anime", posicion: 1 });
+  
+  // AHORA INCLUYE STOCK
+  const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: "", categoria: "Anime", posicion: 1, stock: 10 });
   const [imagenFile, setImagenFile] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [productoEditando, setProductoEditando] = useState<any>(null);
@@ -68,7 +70,7 @@ export default function Home() {
   const [textoRespuesta, setTextoRespuesta] = useState("");
   const [enviandoCorreo, setEnviandoCorreo] = useState(false);
 
-  // 🔥 ESTADOS PARA EL SANDBOX DE PAGO 🔥
+  // ESTADOS SANDBOX PAGO
   const [mostrarCheckout, setMostrarCheckout] = useState(false);
   const [metodoPago, setMetodoPago] = useState("Tarjeta");
   const [procesandoPago, setProcesandoPago] = useState(false);
@@ -117,6 +119,7 @@ export default function Home() {
     }
   }, [usuario, vistaActual, esAdmin]);
 
+  // TIEMPO REAL SOPORTE
   useEffect(() => {
     if (!esAdmin) return;
 
@@ -245,17 +248,28 @@ export default function Home() {
     }
   };
 
-  // 🔥 LÓGICA DEL SANDBOX DE PAGO 🔥
-  const procesarPagoSimulado = (e: React.FormEvent) => {
+  // 🔥 LÓGICA DE PAGO CON DESCUENTO DE STOCK 🔥
+  const procesarPagoSimulado = async (e: React.FormEvent) => {
     e.preventDefault();
     setProcesandoPago(true);
     
-    // Simulamos una conexión con la pasarela de pago (2 segundos)
+    // 1. Descontar el stock en la base de datos
+    for (const item of carrito) {
+      // Buscamos el producto actual para saber su stock real
+      const productoDB = productos.find(p => p.id === item.id);
+      if (productoDB) {
+        const nuevoStock = Math.max(0, productoDB.stock - 1); // Evitamos stock negativo
+        await supabase.from('productos').update({ stock: nuevoStock }).eq('id', item.id);
+      }
+    }
+
+    // 2. Simular el tiempo de carga de la pasarela
     setTimeout(() => {
       setProcesandoPago(false);
       setPagoExitoso(true);
       setNumeroOrden(`PT-${Math.floor(100000 + Math.random() * 900000)}`);
       setCarrito([]); // Vaciamos el carrito
+      cargarProductos(); // Recargamos para ver el nuevo stock
     }, 2000);
   };
 
@@ -311,11 +325,12 @@ export default function Home() {
         precio: Number(nuevoProducto.precio),
         categoria: nuevoProducto.categoria,
         posicion: Number(nuevoProducto.posicion),
+        stock: Number(nuevoProducto.stock), // STOCK
         imagen: urlImagen
       }]);
       if (error) throw error;
       alert("Producto creado exitosamente");
-      setNuevoProducto({ nombre: "", descripcion: "", precio: "", categoria: "Anime", posicion: 1 });
+      setNuevoProducto({ nombre: "", descripcion: "", precio: "", categoria: "Anime", posicion: 1, stock: 10 });
       setImagenFile(null);
       cargarProductos();
     } catch (error: any) {
@@ -340,6 +355,7 @@ export default function Home() {
         precio: Number(productoEditando.precio),
         categoria: productoEditando.categoria,
         posicion: Number(productoEditando.posicion),
+        stock: Number(productoEditando.stock), // STOCK
         imagen: urlImagen
       }).eq('id', productoEditando.id);
 
@@ -370,7 +386,12 @@ export default function Home() {
   };
 
   const volverArriba = () => window.scrollTo({ top: 0, behavior: "smooth" });
-  const agregarAlCarrito = (producto: any) => { setCarrito([...carrito, producto]); setMostrarCarrito(true); };
+  const agregarAlCarrito = (producto: any) => {
+    if (producto.stock <= 0) return; // Seguridad extra
+    setCarrito([...carrito, producto]); 
+    setMostrarCarrito(true); 
+  };
+  
   const eliminarDelCarrito = (indexAEliminar: number) => setCarrito(carrito.filter((_, index) => index !== indexAEliminar));
   const total = carrito.reduce((sum, item) => sum + Number(item.precio), 0);
   
@@ -496,6 +517,7 @@ export default function Home() {
         </div>
       )}
 
+      {/* MODAL EDITAR PRODUCTO CON STOCK */}
       {productoEditando && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -504,7 +526,10 @@ export default function Home() {
               <input type="text" placeholder="Nombre" value={productoEditando.nombre} onChange={(e) => setProductoEditando({...productoEditando, nombre: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
               <input type="number" placeholder="Precio" value={productoEditando.precio} onChange={(e) => setProductoEditando({...productoEditando, precio: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
               <input type="text" placeholder="Categoría" value={productoEditando.categoria} onChange={(e) => setProductoEditando({...productoEditando, categoria: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-              <input type="number" placeholder="Posición (ej: 1)" value={productoEditando.posicion} onChange={(e) => setProductoEditando({...productoEditando, posicion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+              <div className="grid grid-cols-2 gap-2">
+                <input type="number" placeholder="Posición (ej: 1)" value={productoEditando.posicion} onChange={(e) => setProductoEditando({...productoEditando, posicion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                <input type="number" placeholder="Stock disponible" value={productoEditando.stock} onChange={(e) => setProductoEditando({...productoEditando, stock: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+              </div>
               <textarea placeholder="Descripción" value={productoEditando.descripcion} onChange={(e) => setProductoEditando({...productoEditando, descripcion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" rows={3}></textarea>
               <div className="text-sm text-gray-400 mt-2">Dejar en blanco para mantener la imagen actual:</div>
               <input type="file" accept="image/*" onChange={(e) => setImagenFile(e.target.files ? e.target.files[0] : null)} className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
@@ -538,7 +563,6 @@ export default function Home() {
               <span>Total:</span>
               <span>{formatearPrecio(total)}</span>
             </div>
-            {/* BOTÓN QUE ABRE EL CHECKOUT SANDBOX */}
             <button onClick={() => { setMostrarCarrito(false); setMostrarCheckout(true); }} disabled={carrito.length === 0} className="w-full bg-green-600 hover:bg-green-500 text-white py-2 rounded font-bold transition disabled:opacity-50">
               Ir a Pagar
             </button>
@@ -547,13 +571,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* 🔥 MODAL DE SANDBOX DE PAGO 🔥 */}
+      {/* SANDBOX DE PAGO */}
       {mostrarCheckout && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
           <div className="bg-zinc-900 border border-zinc-700 p-6 rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
             
             {pagoExitoso ? (
-              // PANTALLA DE ÉXITO
               <div className="text-center py-8">
                 <div className="mx-auto w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-8 h-8 text-green-500">
@@ -573,7 +596,6 @@ export default function Home() {
                 </button>
               </div>
             ) : (
-              // FORMULARIO DE PAGO
               <>
                 <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
                   <h3 className="text-xl font-bold text-white">Pasarela de Pago <span className="text-xs font-normal text-green-500 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20 ml-2">MODO SANDBOX</span></h3>
@@ -585,7 +607,6 @@ export default function Home() {
                   <span className="text-2xl font-bold text-yellow-500">{formatearPrecio(total)}</span>
                 </div>
 
-                {/* SELECTOR DE MÉTODOS DE PAGO COLOMBIANOS */}
                 <div className="grid grid-cols-2 gap-2 mb-6">
                   {['Tarjeta', 'PSE', 'Nequi', 'Efecty'].map((metodo) => (
                     <button 
@@ -599,7 +620,6 @@ export default function Home() {
                 </div>
 
                 <form onSubmit={procesarPagoSimulado} className="flex flex-col gap-4">
-                  {/* CAMPOS DINÁMICOS SEGÚN EL MÉTODO */}
                   {metodoPago === "Tarjeta" && (
                     <>
                       <input type="text" placeholder="Número de tarjeta (16 dígitos)" required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white font-mono" maxLength={16} />
@@ -646,11 +666,7 @@ export default function Home() {
                     </>
                   )}
 
-                  <button 
-                    type="submit" 
-                    disabled={procesandoPago}
-                    className="w-full mt-4 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg transition disabled:opacity-50 flex justify-center items-center gap-2"
-                  >
+                  <button type="submit" disabled={procesandoPago} className="w-full mt-4 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg transition disabled:opacity-50 flex justify-center items-center gap-2">
                     {procesandoPago ? (
                       <>
                         <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -687,6 +703,7 @@ export default function Home() {
               </div>
             )}
 
+            {/* CATALOGO CON STOCK VISIBLE */}
             {vistaActual === "catalogo" && (
               <section className="py-12 px-4 max-w-6xl mx-auto w-full">
                 <h2 className="text-4xl font-bold text-center mb-12 text-yellow-500">Nuestro Catálogo</h2>
@@ -697,17 +714,33 @@ export default function Home() {
                     {productos.map((prod) => (
                       <div key={prod.id} className="flex flex-col md:flex-row bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 hover:border-yellow-600/50 transition shadow-lg group">
                         <div className="md:w-1/3 h-64 md:h-auto overflow-hidden">
-                          <img src={prod.imagen} alt={prod.nombre} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
+                          <img src={prod.imagen} alt={prod.nombre} className={`w-full h-full object-cover transition duration-500 ${prod.stock <= 0 ? 'grayscale opacity-50' : 'group-hover:scale-110'}`} />
                         </div>
                         <div className="p-6 md:w-2/3 flex flex-col justify-between">
                           <div>
-                            <span className="text-xs font-bold text-yellow-600 uppercase tracking-wider">{prod.categoria}</span>
+                            <div className="flex justify-between items-start">
+                              <span className="text-xs font-bold text-yellow-600 uppercase tracking-wider">{prod.categoria}</span>
+                              {/* BADGE DE STOCK */}
+                              {prod.stock > 5 ? (
+                                <span className="text-xs font-bold text-green-500 bg-green-500/10 px-2 py-1 rounded">En stock: {prod.stock}</span>
+                              ) : prod.stock > 0 ? (
+                                <span className="text-xs font-bold text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded animate-pulse">¡Últimas {prod.stock} unidades!</span>
+                              ) : (
+                                <span className="text-xs font-bold text-red-500 bg-red-500/10 px-2 py-1 rounded">Agotado</span>
+                              )}
+                            </div>
                             <h3 className="text-2xl font-bold mt-1 mb-3">{prod.nombre}</h3>
                             <p className="text-gray-400 mb-4">{prod.descripcion}</p>
                           </div>
-                          <div className="flex justify-between items-center mt-4">
+                          <div className="flex justify-between items-center mt-4 border-t border-zinc-800 pt-4">
                             <span className="text-3xl font-bold text-yellow-500">{formatearPrecio(prod.precio)}</span>
-                            <button onClick={() => agregarAlCarrito(prod)} className="bg-white text-black px-6 py-2 rounded font-bold hover:bg-gray-200 transition">Agregar al Carrito</button>
+                            <button 
+                              onClick={() => agregarAlCarrito(prod)} 
+                              disabled={prod.stock <= 0}
+                              className={`px-6 py-2 rounded font-bold transition ${prod.stock <= 0 ? 'bg-zinc-800 text-gray-500 cursor-not-allowed' : 'bg-white text-black hover:bg-gray-200'}`}
+                            >
+                              {prod.stock <= 0 ? "Agotado" : "Agregar al Carrito"}
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -784,6 +817,7 @@ export default function Home() {
               </section>
             )}
 
+            {/* ADMIN CON STOCK EN TABLA Y FORMULARIO */}
             {vistaActual === "admin" && esAdmin && (
               <section className="py-12 px-4 max-w-7xl mx-auto w-full">
                 <h2 className="text-3xl font-bold mb-8 text-red-500">Panel de Administrador</h2>
@@ -819,13 +853,18 @@ export default function Home() {
                     {adminTab === "productos" && (
                       <div>
                         <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2">Gestión de Productos</h3>
+                        
                         <div className="bg-black/30 p-4 rounded-lg mb-6">
                           <h4 className="text-lg font-bold mb-4 text-white">Agregar Nuevo Producto</h4>
                           <form onSubmit={crearProducto} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <input type="text" placeholder="Nombre del producto" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-                            <input type="number" placeholder="Precio (solo números)" value={nuevoProducto.precio} onChange={(e) => setNuevoProducto({...nuevoProducto, precio: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                            <input type="number" placeholder="Precio" value={nuevoProducto.precio} onChange={(e) => setNuevoProducto({...nuevoProducto, precio: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
                             <input type="text" placeholder="Categoría" value={nuevoProducto.categoria} onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
                             <input type="number" placeholder="Posición (ej: 1)" value={nuevoProducto.posicion} onChange={(e) => setNuevoProducto({...nuevoProducto, posicion: Number(e.target.value)})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                            
+                            {/* CAMPO DE STOCK AL CREAR */}
+                            <input type="number" placeholder="Cantidad en Stock" value={nuevoProducto.stock} onChange={(e) => setNuevoProducto({...nuevoProducto, stock: Number(e.target.value)})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white md:col-span-2" />
+
                             <textarea placeholder="Descripción" value={nuevoProducto.descripcion} onChange={(e) => setNuevoProducto({...nuevoProducto, descripcion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white md:col-span-2" rows={2}></textarea>
                             <div className="md:col-span-2">
                               <label className="block text-sm text-gray-400 mb-1">Imagen del producto</label>
@@ -843,6 +882,7 @@ export default function Home() {
                                 <th className="p-3 hidden md:table-cell">Imagen</th>
                                 <th className="p-3">Nombre</th>
                                 <th className="p-3 hidden md:table-cell">Precio</th>
+                                <th className="p-3">Stock</th>
                                 <th className="p-3 text-right">Acciones</th>
                               </tr>
                             </thead>
@@ -861,6 +901,14 @@ export default function Home() {
                                   <td className="p-3 hidden md:table-cell"><img src={prod.imagen} alt={prod.nombre} className="w-12 h-12 object-cover rounded" /></td>
                                   <td className="p-3">{prod.nombre} <div className="md:hidden text-yellow-500 font-bold text-sm mt-1">{formatearPrecio(prod.precio)}</div></td>
                                   <td className="p-3 hidden md:table-cell"><span className="text-yellow-500 font-bold">{formatearPrecio(prod.precio)}</span></td>
+                                  
+                                  {/* COLUMNA DE STOCK EN LA TABLA */}
+                                  <td className="p-3">
+                                    <span className={`font-bold px-2 py-1 rounded text-sm ${prod.stock > 5 ? 'text-green-400 bg-green-400/10' : prod.stock > 0 ? 'text-yellow-400 bg-yellow-400/10' : 'text-red-400 bg-red-400/10'}`}>
+                                      {prod.stock}
+                                    </span>
+                                  </td>
+
                                   <td className="p-3 text-right flex flex-col md:flex-row items-end md:items-center justify-end gap-2">
                                     <button onClick={() => setProductoEditando(prod)} className="text-blue-400 hover:text-blue-300 text-sm font-bold">Editar</button>
                                     <button onClick={() => eliminarProducto(prod.id)} className="text-red-500 hover:text-red-400 text-sm font-bold">Eliminar</button>
