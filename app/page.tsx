@@ -56,7 +56,6 @@ export default function Home() {
 
   const [adminTab, setAdminTab] = useState("productos");
   
-  // AHORA INCLUYE STOCK
   const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", descripcion: "", precio: "", categoria: "Anime", posicion: 1, stock: 10 });
   const [imagenFile, setImagenFile] = useState<File | null>(null);
   const [subiendo, setSubiendo] = useState(false);
@@ -70,7 +69,6 @@ export default function Home() {
   const [textoRespuesta, setTextoRespuesta] = useState("");
   const [enviandoCorreo, setEnviandoCorreo] = useState(false);
 
-  // ESTADOS SANDBOX PAGO
   const [mostrarCheckout, setMostrarCheckout] = useState(false);
   const [metodoPago, setMetodoPago] = useState("Tarjeta");
   const [procesandoPago, setProcesandoPago] = useState(false);
@@ -119,7 +117,6 @@ export default function Home() {
     }
   }, [usuario, vistaActual, esAdmin]);
 
-  // TIEMPO REAL SOPORTE
   useEffect(() => {
     if (!esAdmin) return;
 
@@ -248,28 +245,24 @@ export default function Home() {
     }
   };
 
-  // 🔥 LÓGICA DE PAGO CON DESCUENTO DE STOCK 🔥
   const procesarPagoSimulado = async (e: React.FormEvent) => {
     e.preventDefault();
     setProcesandoPago(true);
     
-    // 1. Descontar el stock en la base de datos
     for (const item of carrito) {
-      // Buscamos el producto actual para saber su stock real
       const productoDB = productos.find(p => p.id === item.id);
       if (productoDB) {
-        const nuevoStock = Math.max(0, productoDB.stock - 1); // Evitamos stock negativo
+        const nuevoStock = Math.max(0, productoDB.stock - 1); 
         await supabase.from('productos').update({ stock: nuevoStock }).eq('id', item.id);
       }
     }
 
-    // 2. Simular el tiempo de carga de la pasarela
     setTimeout(() => {
       setProcesandoPago(false);
       setPagoExitoso(true);
       setNumeroOrden(`PT-${Math.floor(100000 + Math.random() * 900000)}`);
-      setCarrito([]); // Vaciamos el carrito
-      cargarProductos(); // Recargamos para ver el nuevo stock
+      setCarrito([]); 
+      cargarProductos(); 
     }, 2000);
   };
 
@@ -325,7 +318,7 @@ export default function Home() {
         precio: Number(nuevoProducto.precio),
         categoria: nuevoProducto.categoria,
         posicion: Number(nuevoProducto.posicion),
-        stock: Number(nuevoProducto.stock), // STOCK
+        stock: Number(nuevoProducto.stock),
         imagen: urlImagen
       }]);
       if (error) throw error;
@@ -355,7 +348,7 @@ export default function Home() {
         precio: Number(productoEditando.precio),
         categoria: productoEditando.categoria,
         posicion: Number(productoEditando.posicion),
-        stock: Number(productoEditando.stock), // STOCK
+        stock: Number(productoEditando.stock),
         imagen: urlImagen
       }).eq('id', productoEditando.id);
 
@@ -387,7 +380,7 @@ export default function Home() {
 
   const volverArriba = () => window.scrollTo({ top: 0, behavior: "smooth" });
   const agregarAlCarrito = (producto: any) => {
-    if (producto.stock <= 0) return; // Seguridad extra
+    if (producto.stock <= 0) return; 
     setCarrito([...carrito, producto]); 
     setMostrarCarrito(true); 
   };
@@ -517,25 +510,55 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL EDITAR PRODUCTO CON STOCK */}
+      {/* MODAL EDITAR PRODUCTO */}
       {productoEditando && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
           <div className="bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-2xl font-bold mb-4 text-yellow-500">Editar Producto</h3>
-            <form onSubmit={actualizarProducto} className="flex flex-col gap-3">
-              <input type="text" placeholder="Nombre" value={productoEditando.nombre} onChange={(e) => setProductoEditando({...productoEditando, nombre: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-              <input type="number" placeholder="Precio" value={productoEditando.precio} onChange={(e) => setProductoEditando({...productoEditando, precio: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-              <input type="text" placeholder="Categoría" value={productoEditando.categoria} onChange={(e) => setProductoEditando({...productoEditando, categoria: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-              <div className="grid grid-cols-2 gap-2">
-                <input type="number" placeholder="Posición (ej: 1)" value={productoEditando.posicion} onChange={(e) => setProductoEditando({...productoEditando, posicion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-                <input type="number" placeholder="Stock disponible" value={productoEditando.stock} onChange={(e) => setProductoEditando({...productoEditando, stock: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+            <form onSubmit={actualizarProducto} className="flex flex-col gap-4">
+              
+              <div>
+                <label className="block text-sm text-gray-400 mb-1 font-bold">Nombre del producto</label>
+                <input type="text" placeholder="Ej: Figura de Goku" value={productoEditando.nombre} onChange={(e) => setProductoEditando({...productoEditando, nombre: e.target.value})} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
               </div>
-              <textarea placeholder="Descripción" value={productoEditando.descripcion} onChange={(e) => setProductoEditando({...productoEditando, descripcion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" rows={3}></textarea>
-              <div className="text-sm text-gray-400 mt-2">Dejar en blanco para mantener la imagen actual:</div>
-              <input type="file" accept="image/*" onChange={(e) => setImagenFile(e.target.files ? e.target.files[0] : null)} className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1 font-bold">Precio (COP)</label>
+                <input type="number" placeholder="Ej: 140000" value={productoEditando.precio} onChange={(e) => setProductoEditando({...productoEditando, precio: e.target.value})} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1 font-bold">Categoría</label>
+                <input type="text" placeholder="Ej: Anime, Religioso..." value={productoEditando.categoria} onChange={(e) => setProductoEditando({...productoEditando, categoria: e.target.value})} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1 font-bold">Posición en el catálogo</label>
+                  <input type="number" placeholder="Ej: 1" value={productoEditando.posicion} onChange={(e) => setProductoEditando({...productoEditando, posicion: e.target.value})} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                  <span className="text-xs text-gray-500 mt-1 block">El 1 aparece primero.</span>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1 font-bold">Cantidad en Stock</label>
+                  <input type="number" placeholder="Ej: 10" value={productoEditando.stock} onChange={(e) => setProductoEditando({...productoEditando, stock: e.target.value})} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                  <span className="text-xs text-gray-500 mt-1 block">Unidades disponibles.</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1 font-bold">Descripción</label>
+                <textarea placeholder="Describe la figura..." value={productoEditando.descripcion} onChange={(e) => setProductoEditando({...productoEditando, descripcion: e.target.value})} required className="w-full p-2 bg-zinc-800 border border-zinc-700 rounded text-white" rows={3}></textarea>
+              </div>
+
+              <div className="border-t border-zinc-700 pt-4 mt-2">
+                <label className="block text-sm text-gray-400 mb-1 font-bold">Imagen del producto</label>
+                <p className="text-xs text-gray-500 mb-2">Deja este campo vacío si no quieres cambiar la foto actual.</p>
+                <input type="file" accept="image/*" onChange={(e) => setImagenFile(e.target.files ? e.target.files[0] : null)} className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white w-full text-sm" />
+              </div>
+
               <div className="flex gap-2 mt-4">
-                <button type="submit" disabled={subiendo} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition">{subiendo ? "Guardando..." : "Guardar Cambios"}</button>
-                <button type="button" onClick={() => { setProductoEditando(null); setImagenFile(null); }} className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white font-bold py-2 rounded transition">Cancelar</button>
+                <button type="submit" disabled={subiendo} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded transition">{subiendo ? "Guardando..." : "Guardar Cambios"}</button>
+                <button type="button" onClick={() => { setProductoEditando(null); setImagenFile(null); }} className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white font-bold py-3 rounded transition">Cancelar</button>
               </div>
             </form>
           </div>
@@ -703,7 +726,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* CATALOGO CON STOCK VISIBLE */}
             {vistaActual === "catalogo" && (
               <section className="py-12 px-4 max-w-6xl mx-auto w-full">
                 <h2 className="text-4xl font-bold text-center mb-12 text-yellow-500">Nuestro Catálogo</h2>
@@ -720,7 +742,6 @@ export default function Home() {
                           <div>
                             <div className="flex justify-between items-start">
                               <span className="text-xs font-bold text-yellow-600 uppercase tracking-wider">{prod.categoria}</span>
-                              {/* BADGE DE STOCK */}
                               {prod.stock > 5 ? (
                                 <span className="text-xs font-bold text-green-500 bg-green-500/10 px-2 py-1 rounded">En stock: {prod.stock}</span>
                               ) : prod.stock > 0 ? (
@@ -817,7 +838,7 @@ export default function Home() {
               </section>
             )}
 
-            {/* ADMIN CON STOCK EN TABLA Y FORMULARIO */}
+            {/* ADMIN CON ETIQUETAS CLARAS */}
             {vistaActual === "admin" && esAdmin && (
               <section className="py-12 px-4 max-w-7xl mx-auto w-full">
                 <h2 className="text-3xl font-bold mb-8 text-red-500">Panel de Administrador</h2>
@@ -854,69 +875,96 @@ export default function Home() {
                       <div>
                         <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2">Gestión de Productos</h3>
                         
-                        <div className="bg-black/30 p-4 rounded-lg mb-6">
-                          <h4 className="text-lg font-bold mb-4 text-white">Agregar Nuevo Producto</h4>
-                          <form onSubmit={crearProducto} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <input type="text" placeholder="Nombre del producto" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-                            <input type="number" placeholder="Precio" value={nuevoProducto.precio} onChange={(e) => setNuevoProducto({...nuevoProducto, precio: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-                            <input type="text" placeholder="Categoría" value={nuevoProducto.categoria} onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
-                            <input type="number" placeholder="Posición (ej: 1)" value={nuevoProducto.posicion} onChange={(e) => setNuevoProducto({...nuevoProducto, posicion: Number(e.target.value)})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                        {/* FORMULARIO DE CREAR PRODUCTO CON ETIQUETAS */}
+                        <div className="bg-black/30 p-6 rounded-lg mb-10 border border-zinc-800">
+                          <h4 className="text-xl font-bold mb-4 text-white">Agregar Nuevo Producto</h4>
+                          <form onSubmit={crearProducto} className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             
-                            {/* CAMPO DE STOCK AL CREAR */}
-                            <input type="number" placeholder="Cantidad en Stock" value={nuevoProducto.stock} onChange={(e) => setNuevoProducto({...nuevoProducto, stock: Number(e.target.value)})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white md:col-span-2" />
-
-                            <textarea placeholder="Descripción" value={nuevoProducto.descripcion} onChange={(e) => setNuevoProducto({...nuevoProducto, descripcion: e.target.value})} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white md:col-span-2" rows={2}></textarea>
                             <div className="md:col-span-2">
-                              <label className="block text-sm text-gray-400 mb-1">Imagen del producto</label>
-                              <input type="file" accept="image/*" onChange={(e) => setImagenFile(e.target.files ? e.target.files[0] : null)} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white w-full" />
+                              <label className="block text-sm text-gray-400 mb-1 font-bold">Nombre del producto</label>
+                              <input type="text" placeholder="Ej: Figura de Goku" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({...nuevoProducto, nombre: e.target.value})} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:border-yellow-500 outline-none" />
                             </div>
-                            <button type="submit" disabled={subiendo} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded md:col-span-2 transition">{subiendo ? "Subiendo..." : "Guardar Producto"}</button>
+
+                            <div>
+                              <label className="block text-sm text-gray-400 mb-1 font-bold">Precio (COP)</label>
+                              <input type="number" placeholder="Ej: 140000" value={nuevoProducto.precio} onChange={(e) => setNuevoProducto({...nuevoProducto, precio: e.target.value})} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:border-yellow-500 outline-none" />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm text-gray-400 mb-1 font-bold">Categoría</label>
+                              <input type="text" placeholder="Ej: Anime, Religioso..." value={nuevoProducto.categoria} onChange={(e) => setNuevoProducto({...nuevoProducto, categoria: e.target.value})} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:border-yellow-500 outline-none" />
+                            </div>
+
+                            <div>
+                              <label className="block text-sm text-gray-400 mb-1 font-bold">Posición en el catálogo</label>
+                              <input type="number" placeholder="Ej: 1" value={nuevoProducto.posicion} onChange={(e) => setNuevoProducto({...nuevoProducto, posicion: Number(e.target.value)})} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:border-yellow-500 outline-none" />
+                              <span className="text-xs text-gray-500 mt-1 block">El 1 aparece primero en la tienda.</span>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm text-gray-400 mb-1 font-bold">Cantidad en Stock</label>
+                              <input type="number" placeholder="Ej: 10" value={nuevoProducto.stock} onChange={(e) => setNuevoProducto({...nuevoProducto, stock: Number(e.target.value)})} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:border-yellow-500 outline-none" />
+                              <span className="text-xs text-gray-500 mt-1 block">Unidades disponibles para vender.</span>
+                            </div>
+
+                            <div className="md:col-span-2">
+                              <label className="block text-sm text-gray-400 mb-1 font-bold">Descripción</label>
+                              <textarea placeholder="Describe los detalles de la figura..." value={nuevoProducto.descripcion} onChange={(e) => setNuevoProducto({...nuevoProducto, descripcion: e.target.value})} required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:border-yellow-500 outline-none" rows={3}></textarea>
+                            </div>
+                            
+                            <div className="md:col-span-2">
+                              <label className="block text-sm text-gray-400 mb-1 font-bold">Imagen del producto</label>
+                              <input type="file" accept="image/*" onChange={(e) => setImagenFile(e.target.files ? e.target.files[0] : null)} required className="p-2 bg-zinc-800 border border-zinc-700 rounded text-white w-full text-sm" />
+                            </div>
+                            
+                            <button type="submit" disabled={subiendo} className="bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded md:col-span-2 transition text-lg mt-2">{subiendo ? "Subiendo..." : "Guardar Producto"}</button>
                           </form>
                         </div>
 
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left border-collapse">
-                            <thead>
-                              <tr className="bg-black text-yellow-500 border-b border-zinc-800">
-                                <th className="p-3">Pos</th>
-                                <th className="p-3 hidden md:table-cell">Imagen</th>
-                                <th className="p-3">Nombre</th>
-                                <th className="p-3 hidden md:table-cell">Precio</th>
-                                <th className="p-3">Stock</th>
-                                <th className="p-3 text-right">Acciones</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {productos.map((prod) => (
-                                <tr key={prod.id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
-                                  <td className="p-3">
-                                    <div className="flex items-center gap-1">
-                                      <span className="text-gray-400 w-6">{prod.posicion}</span>
-                                      <div className="flex flex-col">
-                                        <button onClick={() => moverPosicion(prod, 'subir')} className="text-gray-500 hover:text-white text-xs">▲</button>
-                                        <button onClick={() => moverPosicion(prod, 'bajar')} className="text-gray-500 hover:text-white text-xs">▼</button>
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="p-3 hidden md:table-cell"><img src={prod.imagen} alt={prod.nombre} className="w-12 h-12 object-cover rounded" /></td>
-                                  <td className="p-3">{prod.nombre} <div className="md:hidden text-yellow-500 font-bold text-sm mt-1">{formatearPrecio(prod.precio)}</div></td>
-                                  <td className="p-3 hidden md:table-cell"><span className="text-yellow-500 font-bold">{formatearPrecio(prod.precio)}</span></td>
-                                  
-                                  {/* COLUMNA DE STOCK EN LA TABLA */}
-                                  <td className="p-3">
-                                    <span className={`font-bold px-2 py-1 rounded text-sm ${prod.stock > 5 ? 'text-green-400 bg-green-400/10' : prod.stock > 0 ? 'text-yellow-400 bg-yellow-400/10' : 'text-red-400 bg-red-400/10'}`}>
-                                      {prod.stock}
-                                    </span>
-                                  </td>
-
-                                  <td className="p-3 text-right flex flex-col md:flex-row items-end md:items-center justify-end gap-2">
-                                    <button onClick={() => setProductoEditando(prod)} className="text-blue-400 hover:text-blue-300 text-sm font-bold">Editar</button>
-                                    <button onClick={() => eliminarProducto(prod.id)} className="text-red-500 hover:text-red-400 text-sm font-bold">Eliminar</button>
-                                  </td>
+                        {/* LISTA DE PRODUCTOS */}
+                        <div className="border-t border-zinc-800 pt-6">
+                          <h4 className="text-xl font-bold mb-4 text-white">Listado de Productos (Para Editar o Eliminar)</h4>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="bg-black text-yellow-500 border-b border-zinc-800 text-sm">
+                                  <th className="p-3">Orden</th>
+                                  <th className="p-3 hidden md:table-cell">Imagen</th>
+                                  <th className="p-3">Nombre</th>
+                                  <th className="p-3 hidden md:table-cell">Precio</th>
+                                  <th className="p-3">Stock</th>
+                                  <th className="p-3 text-right">Acciones</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                              </thead>
+                              <tbody>
+                                {productos.map((prod) => (
+                                  <tr key={prod.id} className="border-b border-zinc-800 hover:bg-zinc-800/50">
+                                    <td className="p-3">
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-gray-400 w-6">{prod.posicion}</span>
+                                        <div className="flex flex-col">
+                                          <button onClick={() => moverPosicion(prod, 'subir')} className="text-gray-500 hover:text-white text-xs">▲</button>
+                                          <button onClick={() => moverPosicion(prod, 'bajar')} className="text-gray-500 hover:text-white text-xs">▼</button>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="p-3 hidden md:table-cell"><img src={prod.imagen} alt={prod.nombre} className="w-12 h-12 object-cover rounded" /></td>
+                                    <td className="p-3">{prod.nombre} <div className="md:hidden text-yellow-500 font-bold text-sm mt-1">{formatearPrecio(prod.precio)}</div></td>
+                                    <td className="p-3 hidden md:table-cell"><span className="text-yellow-500 font-bold">{formatearPrecio(prod.precio)}</span></td>
+                                    <td className="p-3">
+                                      <span className={`font-bold px-2 py-1 rounded text-sm ${prod.stock > 5 ? 'text-green-400 bg-green-400/10' : prod.stock > 0 ? 'text-yellow-400 bg-yellow-400/10' : 'text-red-400 bg-red-400/10'}`}>
+                                        {prod.stock}
+                                      </span>
+                                    </td>
+                                    <td className="p-3 text-right flex flex-col md:flex-row items-end md:items-center justify-end gap-2">
+                                      <button onClick={() => setProductoEditando(prod)} className="text-blue-400 hover:text-blue-300 text-sm font-bold">Editar</button>
+                                      <button onClick={() => eliminarProducto(prod.id)} className="text-red-500 hover:text-red-400 text-sm font-bold">Eliminar</button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       </div>
                     )}
