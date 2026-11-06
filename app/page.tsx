@@ -68,6 +68,13 @@ export default function Home() {
   const [textoRespuesta, setTextoRespuesta] = useState("");
   const [enviandoCorreo, setEnviandoCorreo] = useState(false);
 
+  // 🔥 ESTADOS PARA EL SANDBOX DE PAGO 🔥
+  const [mostrarCheckout, setMostrarCheckout] = useState(false);
+  const [metodoPago, setMetodoPago] = useState("Tarjeta");
+  const [procesandoPago, setProcesandoPago] = useState(false);
+  const [pagoExitoso, setPagoExitoso] = useState(false);
+  const [numeroOrden, setNumeroOrden] = useState("");
+
   const cargarProductos = async () => {
     const { data } = await supabase.from('productos').select('*').order('posicion', { ascending: true });
     if (data) setProductos(data);
@@ -110,28 +117,23 @@ export default function Home() {
     }
   }, [usuario, vistaActual, esAdmin]);
 
-  // 🔥 LÓGICA DE TIEMPO REAL (REALTIME) 🔥
   useEffect(() => {
     if (!esAdmin) return;
 
-    // Escuchamos cualquier cambio en la tabla mensajes_soporte
     const channel = supabase
       .channel('realtime-soporte')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'mensajes_soporte' },
         (payload) => {
-          // Si borran el mensaje que estamos viendo en el detalle, volvemos a la lista
           if (payload.eventType === 'DELETE' && selectedMessage && payload.old.id === selectedMessage.id) {
             setSelectedMessage(null);
           }
-          // Recargamos la lista de mensajes en tiempo real
           cargarMensajes();
         }
       )
       .subscribe();
 
-    // Limpiamos la conexión cuando salimos del panel
     return () => {
       supabase.removeChannel(channel);
     };
@@ -194,7 +196,6 @@ export default function Home() {
 
   const marcarMensajeLeido = async (id: number, estadoActual: boolean) => {
     await supabase.from('mensajes_soporte').update({ leido: !estadoActual }).eq('id', id);
-    // No hace falta llamar a cargarMensajes() manualmente, el Realtime lo hará.
     if (selectedMessage && selectedMessage.id === id) {
       setSelectedMessage({ ...selectedMessage, leido: !estadoActual });
     }
@@ -206,7 +207,6 @@ export default function Home() {
       if (error) {
         alert("Error al eliminar: " + error.message);
       } else {
-        // El Realtime se encarga de actualizar la lista y cerrar el detalle si es necesario
         if (selectedMessage && selectedMessage.id === id) {
           setSelectedMessage(null);
         }
@@ -234,18 +234,35 @@ export default function Home() {
         alert("¡Correo enviado exitosamente!");
         setMostrarModalRespuesta(false);
         setTextoRespuesta("");
-        if (!selectedMessage.leido) {
-          marcarMensajeLeido(selectedMessage.id, false);
-        }
+        if (!selectedMessage.leido) marcarMensajeLeido(selectedMessage.id, false);
       } else {
-        alert("Hubo un error al enviar el correo. Revisa la consola.");
+        alert("Hubo un error al enviar el correo.");
       }
     } catch (error) {
-      console.error(error);
       alert("Error de red al enviar el correo.");
     } finally {
       setEnviandoCorreo(false);
     }
+  };
+
+  // 🔥 LÓGICA DEL SANDBOX DE PAGO 🔥
+  const procesarPagoSimulado = (e: React.FormEvent) => {
+    e.preventDefault();
+    setProcesandoPago(true);
+    
+    // Simulamos una conexión con la pasarela de pago (2 segundos)
+    setTimeout(() => {
+      setProcesandoPago(false);
+      setPagoExitoso(true);
+      setNumeroOrden(`PT-${Math.floor(100000 + Math.random() * 900000)}`);
+      setCarrito([]); // Vaciamos el carrito
+    }, 2000);
+  };
+
+  const cerrarCheckout = () => {
+    setMostrarCheckout(false);
+    setPagoExitoso(false);
+    setProcesandoPago(false);
   };
 
   const agregarAdmin = async (e: React.FormEvent) => {
@@ -521,25 +538,131 @@ export default function Home() {
               <span>Total:</span>
               <span>{formatearPrecio(total)}</span>
             </div>
-            <button onClick={() => alert("¡Próximamente pasarela de pagos!")} className="w-full bg-green-600 hover:bg-green-500 text-white py-2 rounded font-bold transition">Finalizar Compra</button>
+            {/* BOTÓN QUE ABRE EL CHECKOUT SANDBOX */}
+            <button onClick={() => { setMostrarCarrito(false); setMostrarCheckout(true); }} disabled={carrito.length === 0} className="w-full bg-green-600 hover:bg-green-500 text-white py-2 rounded font-bold transition disabled:opacity-50">
+              Ir a Pagar
+            </button>
             <button onClick={() => setMostrarCarrito(false)} className="w-full mt-2 text-xs text-gray-400 hover:text-white">Cerrar</button>
           </div>
         </div>
       )}
 
-      {mostrarModalRespuesta && selectedMessage && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-zinc-900 border border-yellow-600 p-6 rounded-lg shadow-2xl w-full max-w-lg">
-            <h3 className="text-xl font-bold mb-2 text-yellow-500">Responder a {selectedMessage.nombre}</h3>
-            <p className="text-sm text-gray-400 mb-4">Para: {selectedMessage.email}</p>
+      {/* 🔥 MODAL DE SANDBOX DE PAGO 🔥 */}
+      {mostrarCheckout && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+          <div className="bg-zinc-900 border border-zinc-700 p-6 rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
             
-            <form onSubmit={enviarCorreoRespuesta} className="flex flex-col gap-4">
-              <textarea required rows={6} value={textoRespuesta} onChange={(e) => setTextoRespuesta(e.target.value)} className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white focus:outline-none focus:border-yellow-500" placeholder="Escribe tu respuesta aquí..."></textarea>
-              <div className="flex gap-2 mt-2">
-                <button type="submit" disabled={enviandoCorreo} className="flex-1 bg-green-600 hover:bg-green-500 text-white font-bold py-2 rounded transition disabled:opacity-50">{enviandoCorreo ? "Enviando Correo..." : "Enviar Correo"}</button>
-                <button type="button" onClick={() => setMostrarModalRespuesta(false)} className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white font-bold py-2 rounded transition">Cancelar</button>
+            {pagoExitoso ? (
+              // PANTALLA DE ÉXITO
+              <div className="text-center py-8">
+                <div className="mx-auto w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-8 h-8 text-green-500">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">¡Pago Exitoso!</h3>
+                <p className="text-gray-400 mb-6">Tu pedido ha sido procesado correctamente.</p>
+                
+                <div className="bg-black/50 p-4 rounded-lg mb-6 inline-block text-left">
+                  <p className="text-xs text-gray-500 mb-1">Número de orden</p>
+                  <p className="text-xl font-mono text-yellow-500 font-bold tracking-wider">{numeroOrden}</p>
+                </div>
+
+                <button onClick={cerrarCheckout} className="w-full bg-zinc-700 hover:bg-zinc-600 text-white font-bold py-3 rounded-lg transition">
+                  Volver a la tienda
+                </button>
               </div>
-            </form>
+            ) : (
+              // FORMULARIO DE PAGO
+              <>
+                <div className="flex justify-between items-center mb-6 border-b border-zinc-800 pb-4">
+                  <h3 className="text-xl font-bold text-white">Pasarela de Pago <span className="text-xs font-normal text-green-500 bg-green-500/10 px-2 py-0.5 rounded border border-green-500/20 ml-2">MODO SANDBOX</span></h3>
+                  <button onClick={cerrarCheckout} className="text-gray-500 hover:text-white text-xl">✕</button>
+                </div>
+
+                <div className="flex justify-between items-center mb-6 bg-black/30 p-3 rounded-lg border border-zinc-800">
+                  <span className="text-gray-400">Total a pagar:</span>
+                  <span className="text-2xl font-bold text-yellow-500">{formatearPrecio(total)}</span>
+                </div>
+
+                {/* SELECTOR DE MÉTODOS DE PAGO COLOMBIANOS */}
+                <div className="grid grid-cols-2 gap-2 mb-6">
+                  {['Tarjeta', 'PSE', 'Nequi', 'Efecty'].map((metodo) => (
+                    <button 
+                      key={metodo}
+                      onClick={() => setMetodoPago(metodo)}
+                      className={`py-2 px-3 rounded-lg border text-sm font-bold transition text-center ${metodoPago === metodo ? 'bg-yellow-600 border-yellow-600 text-black' : 'bg-zinc-800 border-zinc-700 text-gray-300 hover:bg-zinc-700'}`}
+                    >
+                      {metodo}
+                    </button>
+                  ))}
+                </div>
+
+                <form onSubmit={procesarPagoSimulado} className="flex flex-col gap-4">
+                  {/* CAMPOS DINÁMICOS SEGÚN EL MÉTODO */}
+                  {metodoPago === "Tarjeta" && (
+                    <>
+                      <input type="text" placeholder="Número de tarjeta (16 dígitos)" required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white font-mono" maxLength={16} />
+                      <div className="flex gap-2">
+                        <input type="text" placeholder="MM/YY" required className="w-1/2 p-3 bg-zinc-800 border border-zinc-700 rounded text-white text-center" maxLength={5} />
+                        <input type="password" placeholder="CVV" required className="w-1/2 p-3 bg-zinc-800 border border-zinc-700 rounded text-white text-center" maxLength={3} />
+                      </div>
+                      <input type="text" placeholder="Nombre del titular" required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white uppercase" />
+                    </>
+                  )}
+
+                  {metodoPago === "PSE" && (
+                    <>
+                      <select required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white">
+                        <option value="">Selecciona tu banco...</option>
+                        <option value="bancolombia">Bancolombia</option>
+                        <option value="davivienda">Davivienda</option>
+                        <option value="bogota">Banco de Bogotá</option>
+                        <option value="colpatria">Scotiabank Colpatria</option>
+                        <option value="nequi">Nequi</option>
+                        <option value="daviplata">Daviplata</option>
+                      </select>
+                      <select required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white">
+                        <option value="cc">Cédula de Ciudadanía</option>
+                        <option value="ce">Cédula de Extranjería</option>
+                        <option value="nit">NIT</option>
+                      </select>
+                      <input type="text" placeholder="Número de documento" required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                    </>
+                  )}
+
+                  {metodoPago === "Nequi" && (
+                    <>
+                      <input type="tel" placeholder="Número de celular (10 dígitos)" required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white text-center text-lg tracking-widest" maxLength={10} />
+                      <p className="text-xs text-gray-400 text-center">Recibirás una notificación en tu app de Nequi para aprobar el pago.</p>
+                    </>
+                  )}
+
+                  {metodoPago === "Efecty" && (
+                    <>
+                      <input type="text" placeholder="Nombre completo" required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                      <input type="text" placeholder="Número de cédula" required className="w-full p-3 bg-zinc-800 border border-zinc-700 rounded text-white" />
+                      <p className="text-xs text-gray-400 text-center">Se generará un código de recaudo para pagar en cualquier punto Efecty.</p>
+                    </>
+                  )}
+
+                  <button 
+                    type="submit" 
+                    disabled={procesandoPago}
+                    className="w-full mt-4 bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg transition disabled:opacity-50 flex justify-center items-center gap-2"
+                  >
+                    {procesandoPago ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        Procesando pago...
+                      </>
+                    ) : (
+                      `Pagar ${formatearPrecio(total)}`
+                    )}
+                  </button>
+                </form>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -661,13 +784,11 @@ export default function Home() {
               </section>
             )}
 
-            {/* VISTA: PANEL DE ADMINISTRADOR CON SIDEBAR */}
             {vistaActual === "admin" && esAdmin && (
               <section className="py-12 px-4 max-w-7xl mx-auto w-full">
                 <h2 className="text-3xl font-bold mb-8 text-red-500">Panel de Administrador</h2>
                 
                 <div className="flex flex-col md:flex-row gap-8">
-                  
                   <div className="w-full md:w-64 flex flex-col gap-2">
                     <button onClick={() => setAdminTab("productos")} className={`p-4 text-left rounded-lg font-bold transition flex items-center gap-3 ${adminTab === 'productos' ? 'bg-yellow-600 text-black' : 'bg-zinc-900 text-gray-300 hover:bg-zinc-800'}`}>
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
@@ -695,11 +816,9 @@ export default function Home() {
                   </div>
 
                   <div className="flex-1 bg-zinc-900 border border-zinc-800 p-6 rounded-xl shadow-lg min-h-[60vh] overflow-hidden">
-                    
                     {adminTab === "productos" && (
                       <div>
                         <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2">Gestión de Productos</h3>
-                        
                         <div className="bg-black/30 p-4 rounded-lg mb-6">
                           <h4 className="text-lg font-bold mb-4 text-white">Agregar Nuevo Producto</h4>
                           <form onSubmit={crearProducto} className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -872,7 +991,6 @@ export default function Home() {
                         </div>
                       </div>
                     )}
-
                   </div>
                 </div>
               </section>
