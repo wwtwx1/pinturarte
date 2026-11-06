@@ -62,11 +62,13 @@ export default function Home() {
   const [seccionAbierta, setSeccionAbierta] = useState<string | null>(null);
   
   const [nuevoAdminEmail, setNuevoAdminEmail] = useState("");
+  
+  // NUEVO ESTADO: Para ver el detalle de un mensaje
+  const [selectedMessage, setSelectedMessage] = useState<any>(null);
 
   const cargarProductos = async () => {
     const { data, error } = await supabase.from('productos').select('*').order('posicion', { ascending: true });
     if (data) setProductos(data);
-    if (error) console.error("Error cargando productos:", error);
   };
 
   const cargarMensajes = async () => {
@@ -97,7 +99,6 @@ export default function Home() {
     return () => authListener.subscription.unsubscribe();
   }, []);
 
-  // LÓGICA CORREGIDA: Compara en minúsculas y asegura que el SUPER_ADMIN siempre entre
   const esAdmin = usuario?.email?.toLowerCase() === SUPER_ADMIN.toLowerCase() || 
                   adminsList.some(a => a.email?.toLowerCase() === usuario?.email?.toLowerCase());
 
@@ -145,6 +146,7 @@ export default function Home() {
     setUsuario(null);
     if (vistaActual === "admin") setVistaActual("inicio");
     setMenuAbierto(false);
+    setSelectedMessage(null);
   };
 
   const enviarFormularioContacto = async (e: React.FormEvent) => {
@@ -164,6 +166,20 @@ export default function Home() {
   const marcarMensajeLeido = async (id: number, estadoActual: boolean) => {
     await supabase.from('mensajes_soporte').update({ leido: !estadoActual }).eq('id', id);
     cargarMensajes();
+    // Si estamos viendo el detalle, actualizamos la vista
+    if (selectedMessage && selectedMessage.id === id) {
+      setSelectedMessage({ ...selectedMessage, leido: !estadoActual });
+    }
+  };
+
+  const eliminarMensaje = async (id: number) => {
+    if (confirm("¿Estás seguro de eliminar este mensaje de soporte?")) {
+      await supabase.from('mensajes_soporte').delete().eq('id', id);
+      cargarMensajes();
+      if (selectedMessage && selectedMessage.id === id) {
+        setSelectedMessage(null);
+      }
+    }
   };
 
   const agregarAdmin = async (e: React.FormEvent) => {
@@ -279,6 +295,7 @@ export default function Home() {
     setVistaActual(vista);
     setMensajeEnviado(false);
     setMenuAbierto(false);
+    setSelectedMessage(null); // Resetea el mensaje seleccionado al cambiar de vista
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -556,7 +573,7 @@ export default function Home() {
                 <h2 className="text-4xl font-bold mb-6 text-yellow-500">Nuestros Cursos y Talleres</h2>
                 <p className="text-gray-300 text-lg mb-8 max-w-2xl mx-auto">¡Aprende el arte de la pintura en yeso! Déjanos tus datos en el siguiente formulario para inscribirte y te contactaremos pronto.</p>
                 <div className="w-full bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800 p-2">
-                  <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSdM_LerAvp8_YcIXyLxVDjlwUK1hu5ucyZBNR94rncKFBsScA/viewform?usp=publish-editor" className="w-full min-h-[600px] md:min-h-[800px] rounded-lg bg-white" frameBorder="0" marginHeight={0} marginWidth={0}>Cargando formulario...</iframe>
+                  <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSdM_LerAvp8_YcIXyLxVDjlwUK1hu5ucyZBNR94rncKFBsScA/viewform?embedded=true" className="w-full min-h-[600px] md:min-h-[800px] rounded-lg bg-white" frameBorder="0" marginHeight={0} marginWidth={0}>Cargando formulario...</iframe>
                 </div>
               </section>
             )}
@@ -568,13 +585,14 @@ export default function Home() {
                 
                 <div className="flex flex-col md:flex-row gap-8">
                   
+                  {/* SIDEBAR */}
                   <div className="w-full md:w-64 flex flex-col gap-2">
                     <button onClick={() => setAdminTab("productos")} className={`p-4 text-left rounded-lg font-bold transition flex items-center gap-3 ${adminTab === 'productos' ? 'bg-yellow-600 text-black' : 'bg-zinc-900 text-gray-300 hover:bg-zinc-800'}`}>
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
                       Productos
                     </button>
                     
-                    <button onClick={() => setAdminTab("soporte")} className={`p-4 text-left rounded-lg font-bold transition flex items-center justify-between ${adminTab === 'soporte' ? 'bg-yellow-600 text-black' : 'bg-zinc-900 text-gray-300 hover:bg-zinc-800'}`}>
+                    <button onClick={() => { setAdminTab("soporte"); setSelectedMessage(null); }} className={`p-4 text-left rounded-lg font-bold transition flex items-center justify-between ${adminTab === 'soporte' ? 'bg-yellow-600 text-black' : 'bg-zinc-900 text-gray-300 hover:bg-zinc-800'}`}>
                       <div className="flex items-center gap-3">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
@@ -594,8 +612,10 @@ export default function Home() {
                     </button>
                   </div>
 
-                  <div className="flex-1 bg-zinc-900 border border-zinc-800 p-6 rounded-xl shadow-lg min-h-[60vh]">
+                  {/* CONTENIDO DEL ADMIN */}
+                  <div className="flex-1 bg-zinc-900 border border-zinc-800 p-6 rounded-xl shadow-lg min-h-[60vh] overflow-hidden">
                     
+                    {/* TAB: PRODUCTOS */}
                     {adminTab === "productos" && (
                       <div>
                         <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2">Gestión de Productos</h3>
@@ -654,42 +674,112 @@ export default function Home() {
                       </div>
                     )}
 
+                    {/* TAB: SOPORTE CON VISTA DETALLE */}
                     {adminTab === "soporte" && (
                       <div>
-                        <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2 flex items-center gap-2">
-                          Bandeja de Soporte
-                          {mensajesNoLeidos > 0 && <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">{mensajesNoLeidos} nuevos</span>}
-                        </h3>
-                        
-                        {mensajes.length === 0 ? (
-                          <p className="text-gray-400 text-center py-10">No hay mensajes de soporte por ahora.</p>
-                        ) : (
-                          <div className="flex flex-col gap-4">
-                            {mensajes.map((msg) => (
-                              <div key={msg.id} className={`p-5 rounded-xl border ${msg.leido ? 'bg-zinc-900/50 border-zinc-800' : 'bg-zinc-800 border-yellow-600/50 shadow-lg'}`}>
-                                <div className="flex flex-col md:flex-row justify-between md:items-center mb-3 gap-2">
-                                  <div>
-                                    <span className="font-bold text-lg text-white">{msg.nombre}</span>
-                                    <span className="text-gray-400 text-sm ml-2">({msg.email})</span>
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-yellow-500 bg-black px-2 py-1 rounded">{msg.motivo}</span>
-                                    <span className="text-xs text-gray-500">{new Date(msg.created_at).toLocaleDateString()}</span>
-                                  </div>
+                        {selectedMessage ? (
+                          // VISTA DE DETALLE DEL MENSAJE
+                          <div>
+                            <button 
+                              onClick={() => setSelectedMessage(null)} 
+                              className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition font-bold"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
+                              Volver a la lista
+                            </button>
+
+                            <div className="bg-zinc-800 rounded-xl border border-zinc-700 p-6 shadow-xl">
+                              <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4 border-b border-zinc-700 pb-4">
+                                <div>
+                                  <h3 className="text-2xl font-bold text-white">{selectedMessage.nombre}</h3>
+                                  <a href={`mailto:${selectedMessage.email}`} className="text-yellow-500 hover:underline text-sm">{selectedMessage.email}</a>
                                 </div>
-                                <p className="text-gray-300 mb-4 whitespace-pre-line text-sm bg-black/30 p-3 rounded">{msg.mensaje}</p>
-                                <div className="flex justify-end">
-                                  <button onClick={() => marcarMensajeLeido(msg.id, msg.leido)} className={`text-sm font-bold px-4 py-2 rounded transition ${msg.leido ? 'text-gray-400 bg-zinc-800 hover:text-white' : 'text-black bg-yellow-600 hover:bg-yellow-500'}`}>
-                                    {msg.leido ? "Marcar como no leído" : "Marcar como leído"}
-                                  </button>
+                                <div className="flex flex-col items-end gap-2">
+                                  <span className="text-xs font-bold uppercase tracking-wider text-yellow-500 bg-black px-3 py-1 rounded">{selectedMessage.motivo}</span>
+                                  <span className="text-xs text-gray-500">Recibido el {new Date(selectedMessage.created_at).toLocaleDateString()}</span>
                                 </div>
                               </div>
-                            ))}
+                              
+                              <div className="mb-8">
+                                <h4 className="text-sm font-bold text-gray-400 mb-2">Mensaje del cliente:</h4>
+                                <p className="text-gray-200 whitespace-pre-wrap break-words bg-black/30 p-4 rounded-lg leading-relaxed">
+                                  {selectedMessage.mensaje}
+                                </p>
+                              </div>
+
+                              <div className="flex flex-col md:flex-row justify-end gap-3">
+                                <button 
+                                  onClick={() => eliminarMensaje(selectedMessage.id)} 
+                                  className="px-4 py-2 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white rounded font-bold transition text-sm"
+                                >
+                                  Eliminar Mensaje
+                                </button>
+                                <button 
+                                  onClick={() => marcarMensajeLeido(selectedMessage.id, selectedMessage.leido)} 
+                                  className={`px-4 py-2 rounded font-bold transition text-sm ${selectedMessage.leido ? 'bg-zinc-700 text-gray-300 hover:bg-zinc-600' : 'bg-yellow-600 text-black hover:bg-yellow-500'}`}
+                                >
+                                  {selectedMessage.leido ? "Marcar como no leído" : "Marcar como leído"}
+                                </button>
+                                <a 
+                                  href={`mailto:${selectedMessage.email}?subject=Respuesta a tu consulta: ${selectedMessage.motivo}`}
+                                  className="px-6 py-2 bg-green-600 text-white hover:bg-green-500 rounded font-bold transition text-sm flex items-center justify-center gap-2"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+                                  Responder por Correo
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          // VISTA DE LISTA
+                          <div>
+                            <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2 flex items-center gap-2">
+                              Bandeja de Soporte
+                              {mensajesNoLeidos > 0 && <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full animate-pulse">{mensajesNoLeidos} nuevos</span>}
+                            </h3>
+                            
+                            {mensajes.length === 0 ? (
+                              <p className="text-gray-400 text-center py-10">No hay mensajes de soporte por ahora.</p>
+                            ) : (
+                              <div className="flex flex-col gap-3">
+                                {mensajes.map((msg) => (
+                                  <div 
+                                    key={msg.id} 
+                                    onClick={() => setSelectedMessage(msg)}
+                                    className={`p-4 rounded-xl border cursor-pointer transition hover:scale-[1.01] ${msg.leido ? 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-600' : 'bg-zinc-800 border-yellow-600/50 shadow-lg hover:border-yellow-500'}`}
+                                  >
+                                    <div className="flex flex-col md:flex-row justify-between md:items-center mb-2 gap-2">
+                                      <div className="flex items-center gap-3">
+                                        <span className="font-bold text-white">{msg.nombre}</span>
+                                        <span className="text-xs font-bold uppercase tracking-wider text-black bg-yellow-500 px-2 py-0.5 rounded">{msg.motivo}</span>
+                                      </div>
+                                      <span className="text-xs text-gray-400">{new Date(msg.created_at).toLocaleDateString()}</span>
+                                    </div>
+                                    
+                                    {/* Texto resumido con break-words para evitar el bug de desbordamiento */}
+                                    <p className="text-gray-400 text-sm line-clamp-2 break-words mb-3">
+                                      {msg.mensaje}
+                                    </p>
+
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-xs text-blue-400 hover:text-blue-300 font-bold">Ver detalle completo &rarr;</span>
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); eliminarMensaje(msg.id); }} 
+                                        className="text-red-500 hover:text-red-400 text-xs font-bold px-2 py-1 bg-black/30 rounded"
+                                      >
+                                        Eliminar
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
                     )}
 
+                    {/* TAB: USUARIOS */}
                     {adminTab === "usuarios" && (
                       <div>
                         <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2">Administrar Usuarios (Rangos)</h3>
