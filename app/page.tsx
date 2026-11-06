@@ -742,7 +742,8 @@ export default function Home() {
                           <div>
                             <div className="flex justify-between items-start">
                               <span className="text-xs font-bold text-yellow-600 uppercase tracking-wider">{prod.categoria}</span>
-                              {prod.stock > 5 ? (
+                              {/* ETIQUETA DE STOCK AJUSTADA A > 3 */}
+                              {prod.stock > 3 ? (
                                 <span className="text-xs font-bold text-green-500 bg-green-500/10 px-2 py-1 rounded">En stock: {prod.stock}</span>
                               ) : prod.stock > 0 ? (
                                 <span className="text-xs font-bold text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded animate-pulse">¡Últimas {prod.stock} unidades!</span>
@@ -875,7 +876,6 @@ export default function Home() {
                       <div>
                         <h3 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-zinc-800 pb-2">Gestión de Productos</h3>
                         
-                        {/* FORMULARIO DE CREAR PRODUCTO CON ETIQUETAS */}
                         <div className="bg-black/30 p-6 rounded-lg mb-10 border border-zinc-800">
                           <h4 className="text-xl font-bold mb-4 text-white">Agregar Nuevo Producto</h4>
                           <form onSubmit={crearProducto} className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -921,7 +921,6 @@ export default function Home() {
                           </form>
                         </div>
 
-                        {/* LISTA DE PRODUCTOS */}
                         <div className="border-t border-zinc-800 pt-6">
                           <h4 className="text-xl font-bold mb-4 text-white">Listado de Productos (Para Editar o Eliminar)</h4>
                           <div className="overflow-x-auto">
@@ -952,7 +951,8 @@ export default function Home() {
                                     <td className="p-3">{prod.nombre} <div className="md:hidden text-yellow-500 font-bold text-sm mt-1">{formatearPrecio(prod.precio)}</div></td>
                                     <td className="p-3 hidden md:table-cell"><span className="text-yellow-500 font-bold">{formatearPrecio(prod.precio)}</span></td>
                                     <td className="p-3">
-                                      <span className={`font-bold px-2 py-1 rounded text-sm ${prod.stock > 5 ? 'text-green-400 bg-green-400/10' : prod.stock > 0 ? 'text-yellow-400 bg-yellow-400/10' : 'text-red-400 bg-red-400/10'}`}>
+                                      {/* ETIQUETA DE STOCK ADMIN AJUSTADA A > 3 */}
+                                      <span className={`font-bold px-2 py-1 rounded text-sm ${prod.stock > 3 ? 'text-green-400 bg-green-400/10' : prod.stock > 0 ? 'text-yellow-400 bg-yellow-400/10' : 'text-red-400 bg-red-400/10'}`}>
                                         {prod.stock}
                                       </span>
                                     </td>
