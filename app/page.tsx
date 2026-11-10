@@ -742,7 +742,6 @@ export default function Home() {
                           <div>
                             <div className="flex justify-between items-start">
                               <span className="text-xs font-bold text-yellow-600 uppercase tracking-wider">{prod.categoria}</span>
-                              {/* ETIQUETA DE STOCK AJUSTADA A > 3 */}
                               {prod.stock > 3 ? (
                                 <span className="text-xs font-bold text-green-500 bg-green-500/10 px-2 py-1 rounded">En stock: {prod.stock}</span>
                               ) : prod.stock > 0 ? (
@@ -835,6 +834,138 @@ export default function Home() {
                 <p className="text-gray-300 text-lg mb-8 max-w-2xl mx-auto">¡Aprende el arte de la pintura en yeso! Déjanos tus datos en el siguiente formulario para inscribirte y te contactaremos pronto.</p>
                 <div className="w-full bg-zinc-900 rounded-xl overflow-hidden shadow-lg border border-zinc-800 p-2">
                   <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSdM_LerAvp8_YcIXyLxVDjlwUK1hu5ucyZBNR94rncKFBsScA/viewform?usp=publish-editor" className="w-full min-h-[600px] md:min-h-[800px] rounded-lg bg-white" frameBorder="0" marginHeight={0} marginWidth={0}>Cargando formulario...</iframe>
+                </div>
+              </section>
+            )}
+
+            {/* NUEVA VISTA: TÉRMINOS Y CONDICIONES */}
+            {vistaActual === "terminos" && (
+              <section className="py-20 px-4 max-w-4xl mx-auto w-full">
+                <h2 className="text-4xl font-bold mb-8 text-center text-yellow-500">Términos y Condiciones</h2>
+                <div className="bg-zinc-900 p-8 rounded-xl border border-zinc-800 shadow-lg text-gray-300 leading-relaxed space-y-6">
+                  
+                  <p className="text-lg italic text-white">¡Bienvenidos a Pinturarte Studio! 💜</p>
+                  
+                  <p>En Pinturarte Studio creemos que cada figura tiene una historia y que el arte permite darle una nueva vida. Trabajamos con dedicación y creatividad en la pintura, personalización y restauración de figuras de yeso, además de ofrecer talleres para aprender y disfrutar del arte.</p>
+                  
+                  <p>Para garantizar una buena experiencia y evitar inconvenientes, te invitamos a leer nuestros siguientes términos y condiciones antes de realizar una compra o contratar alguno de nuestros servicios.</p>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-yellow-500 mt-8 mb-3">1. PRODUCTOS Y SERVICIOS</h3>
+                    <p>En Pinturarte Studio ofrecemos:</p>
+                    <ul className="list-disc list-inside ml-4 mt-2 space-y-1">
+                      <li>Figuras de yeso pintadas y decoradas a mano.</li>
+                      <li>Figuras de yeso en blanco, listas para pintar.</li>
+                      <li>Pintura y personalización de figuras según los gustos del cliente.</li>
+                      <li>Servicio de restauración y renovación de figuras.</li>
+                      <li>Talleres presenciales de pintura para personas interesadas en aprender y desarrollar su creatividad.</li>
+                    </ul>
+                    <p className="mt-2">Cada trabajo se realiza con dedicación y cuidado, procurando ofrecer resultados únicos y personalizados.</p>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-yellow-500 mt-8 mb-3">2. PEDIDOS Y TRABAJOS PERSONALIZADOS</h3>
+                    <ul className="list-disc list-inside ml-4 space-y-2">
+                      <li>Antes de comenzar un trabajo personalizado, consultaremos al cliente cómo desea que sea pintada o decorada su figura.</li>
+                      <li>Si el cliente no tiene una idea definida, podremos compartir propuestas y sugerencias creativas para ayudarle a elegir.</li>
+                      <li>Es importante que el cliente comunique claramente sus preferencias de colores, diseños y detalles antes de iniciar el trabajo.</li>
+                      <li>Una vez aprobado el diseño o la idea principal, cualquier cambio adicional deberá ser consultado, ya que podría modificar el trabajo y el valor acordado.</li>
+                      <li>Los resultados son elaborados a mano, por lo que pueden existir pequeñas variaciones en los detalles y acabados.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-yellow-500 mt-8 mb-3">3. CONDICIONES DEL SERVICIO DE RESTAURACIÓN</h3>
+                    <p>Para nosotros es importante conservar el valor sentimental de cada pieza y devolverle su belleza. Por eso, antes de comenzar una restauración, tendremos en cuenta las siguientes condiciones:</p>
+                    <ul className="list-disc list-inside ml-4 mt-2 space-y-2">
+                      <li>Primero consultaremos al cliente cómo desea que quede su figura y qué cambios le gustaría realizar.</li>
+                      <li>Es importante tener presente que, durante la restauración, es posible que no se utilicen exactamente los mismos materiales con los que fue elaborada o pintada originalmente la figura.</li>
+                      <li>Dependiendo del estado de la pieza y de los materiales disponibles, buscaremos lograr colores similares a los originales o incluso mejorar su apariencia.</li>
+                      <li>Si el cliente desea cambiar los colores o darle un estilo diferente a su figura, puede solicitarlo antes de iniciar el trabajo.</li>
+                      <li>Cada restauración dependerá del estado en el que se encuentre la pieza. Algunas figuras pueden presentar daños, desgastes o detalles que limiten el resultado final.</li>
+                      <li>Se informará al cliente sobre las condiciones de la pieza y las posibilidades de restauración antes de comenzar.</li>
+                    </ul>
+                    <p className="mt-3 italic text-white"><strong>Importante:</strong> El cliente debe tener presente que una restauración no siempre permite recuperar la figura exactamente como era originalmente. Nuestro compromiso es trabajar con dedicación para lograr el mejor resultado posible, de acuerdo con las condiciones de cada pieza.</p>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-yellow-500 mt-8 mb-3">4. PRECIOS Y PAGOS</h3>
+                    <ul className="list-disc list-inside ml-4 space-y-2">
+                      <li>Los precios de nuestros productos y servicios se informarán previamente al cliente.</li>
+                      <li>El valor de las figuras personalizadas y las restauraciones dependerá del tamaño, diseño, detalles y trabajo requerido.</li>
+                      <li>Los pagos pueden realizarse en efectivo o mediante transferencia.</li>
+                      <li>Cualquier modificación en el pedido que implique un trabajo adicional deberá ser consultada y acordada con el cliente.</li>
+                      <li>El cliente deberá verificar el valor acordado antes de confirmar su pedido.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-yellow-500 mt-8 mb-3">5. SEPARACIÓN DE PRODUCTOS</h3>
+                    <p>Si un cliente desea separar una figura o producto, deberá tener en cuenta lo siguiente:</p>
+                    <ul className="list-disc list-inside ml-4 mt-2 space-y-2">
+                      <li>El producto separado quedará reservado a nombre del cliente durante un plazo máximo de 30 días.</li>
+                      <li>Durante este tiempo, el producto no estará disponible para otros compradores.</li>
+                      <li>Se realizará un único aviso al cliente para recordarle que tiene un producto separado.</li>
+                      <li>Si transcurren los 30 días sin que el cliente concrete la compra, Pinturarte Studio podrá dar por terminada la separación y ofrecer nuevamente el producto a otros clientes.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-yellow-500 mt-8 mb-3">6. ENTREGAS Y ENVÍOS</h3>
+                    <ul className="list-disc list-inside ml-4 space-y-2">
+                      <li>Realizamos entregas locales y envíos a diferentes lugares del territorio nacional.</li>
+                      <li>Los detalles del envío y su costo se informarán al cliente antes de confirmar la compra.</li>
+                      <li>El cliente debe proporcionar correctamente sus datos de contacto y dirección de entrega.</li>
+                      <li>Una vez entregado el pedido al servicio de transporte, los tiempos de entrega dependerán de la empresa encargada del envío.</li>
+                      <li>Recomendamos revisar el estado del producto al momento de recibirlo y comunicar cualquier novedad.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-yellow-500 mt-8 mb-3">7. TALLERES PRESENCIALES</h3>
+                    <p>En Pinturarte Studio también ofrecemos talleres de pintura para quienes desean aprender, desarrollar sus habilidades y disfrutar de una experiencia artística.</p>
+                    <ul className="list-disc list-inside ml-4 mt-2 space-y-2">
+                      <li>La información sobre fechas, horarios, precios y disponibilidad se comunicará previamente.</li>
+                      <li>Los participantes deberán respetar las indicaciones y recomendaciones durante el desarrollo de las actividades.</li>
+                      <li>Cualquier inquietud relacionada con la participación deberá comunicarse con anticipación.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-yellow-500 mt-8 mb-3">8. GARANTÍAS Y CUIDADO DE LOS PRODUCTOS</h3>
+                    <p>En Pinturarte Studio procuramos entregar productos y trabajos realizados con dedicación y calidad.</p>
+                    <ul className="list-disc list-inside ml-4 mt-2 space-y-2">
+                      <li>Nuestros productos y servicios cuentan con las garantías correspondientes, de acuerdo con la legislación colombiana vigente y las condiciones aplicables a cada caso.</li>
+                      <li>La garantía no cubre daños ocasionados después de la entrega por mal uso, golpes, rayones, quiebres, manipulación inadecuada o daños atribuibles al cliente o a terceros.</li>
+                      <li>Recomendamos manipular las figuras con cuidado, ya que el yeso es un material delicado y puede romperse o deteriorarse fácilmente.</li>
+                      <li>Cualquier novedad relacionada con el producto deberá ser comunicada oportunamente para revisar el caso.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-yellow-500 mt-8 mb-3">9. ATENCIÓN AL CLIENTE Y COMUNICACIÓN</h3>
+                    <p>Nuestros principales canales de atención son Instagram y WhatsApp. A través de ellos podrás:</p>
+                    <ul className="list-disc list-inside ml-4 mt-2 space-y-2">
+                      <li>Consultar nuestros productos y servicios.</li>
+                      <li>Solicitar cotizaciones.</li>
+                      <li>Compartir ideas para personalizar tus figuras.</li>
+                      <li>Consultar sobre restauraciones.</li>
+                      <li>Recibir información sobre nuestros talleres.</li>
+                      <li>Realizar preguntas sobre pedidos y entregas.</li>
+                    </ul>
+                    <p className="mt-2">Nos comprometemos a brindar una atención amable, respetuosa y clara, buscando siempre la satisfacción de nuestros clientes.</p>
+                  </div>
+
+                  <div>
+                    <h3 className="text-xl font-bold text-yellow-500 mt-8 mb-3">10. ACEPTACIÓN DE LOS TÉRMINOS Y CONDICIONES</h3>
+                    <p>Al realizar una compra, solicitar una restauración, contratar un servicio personalizado o participar en nuestros talleres, el cliente declara que conoce y acepta las condiciones correspondientes.</p>
+                    <p className="mt-2">En Pinturarte Studio trabajamos para que cada experiencia sea especial, ofreciendo creatividad, dedicación y amor por el arte.</p>
+                  </div>
+
+                  <p className="text-lg font-bold text-white mt-8 pt-4 border-t border-zinc-700">¡Gracias por confiar en nuestro trabajo y permitirnos darle vida a tus ideas!</p>
+                  
+                  <p className="text-yellow-500 font-bold tracking-wide">PINTURARTE STUDIO</p>
+                  <p className="text-sm text-gray-500">Tradición hecha creatividad. 💜</p>
                 </div>
               </section>
             )}
@@ -951,7 +1082,6 @@ export default function Home() {
                                     <td className="p-3">{prod.nombre} <div className="md:hidden text-yellow-500 font-bold text-sm mt-1">{formatearPrecio(prod.precio)}</div></td>
                                     <td className="p-3 hidden md:table-cell"><span className="text-yellow-500 font-bold">{formatearPrecio(prod.precio)}</span></td>
                                     <td className="p-3">
-                                      {/* ETIQUETA DE STOCK ADMIN AJUSTADA A > 3 */}
                                       <span className={`font-bold px-2 py-1 rounded text-sm ${prod.stock > 3 ? 'text-green-400 bg-green-400/10' : prod.stock > 0 ? 'text-yellow-400 bg-yellow-400/10' : 'text-red-400 bg-red-400/10'}`}>
                                         {prod.stock}
                                       </span>
@@ -1095,8 +1225,12 @@ export default function Home() {
         </AnimatePresence>
       </main>
 
-      <footer className="bg-black py-8 text-center border-t border-zinc-800 mt-auto z-10">
-        <p className="text-gray-500">© 2026 Pinturarte Studio. Todos los derechos reservados.</p>
+      {/* FOOTER ACTUALIZADO CON BOTÓN DE TÉRMINOS */}
+      <footer className="bg-black py-8 text-center border-t border-zinc-800 mt-auto z-10 flex flex-col items-center gap-2">
+        <button onClick={() => cambiarVista("terminos")} className="text-yellow-500 hover:text-white transition text-sm font-bold underline decoration-yellow-500/30 underline-offset-4">
+          Términos y Condiciones
+        </button>
+        <p className="text-gray-500 text-sm">© 2026 Pinturarte Studio. Todos los derechos reservados.</p>
       </footer>
 
       <AnimatePresence>
